@@ -1,0 +1,6 @@
+
+@usuario1
+@canal_spam
+@grupo_fake
+usuario_sem_arroba
+@bot_malicioso

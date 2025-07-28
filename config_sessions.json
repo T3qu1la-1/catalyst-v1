@@ -1,0 +1,25 @@
+
+{
+  "collection_config": {
+    "api_id": "SEU_API_ID_AQUI",
+    "api_hash": "SEU_API_HASH_AQUI",
+    "phone": "+55SEU_TELEFONE",
+    "max_sessions": 50,
+    "reports_per_session": 10
+  },
+  "target_groups": [
+    "@telegram",
+    "@durov", 
+    "@BotsNews",
+    "@TelegramTips",
+    "@BotNews",
+    "@BotSupport",
+    "@developers",
+    "@design"
+  ],
+  "session_settings": {
+    "session_timeout": 3600,
+    "max_reports_per_day": 20,
+    "delay_between_reports": 2
+  }
+}
