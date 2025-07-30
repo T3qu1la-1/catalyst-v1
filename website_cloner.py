@@ -171,7 +171,24 @@ class AdvancedWebsiteCloner:
             # 6. Processar e salvar HTML principal
             print("🔧 Processando HTML principal...")
             fixed_html = self._fix_html_paths_advanced(main_html, url)
-            with open(f"{self.clone_directory}/index.html", 'w', encoding='utf-8') as f:
+            
+            # Adicionar comentário indicando que é um site clonado
+            clone_comment = f"""
+<!-- 
+    Site clonado pelo Catalyst Server - Website Cloner v2.0
+    URL Original: {url}
+    Data da clonagem: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}
+    Total de recursos baixados: {len(all_resources)}
+-->
+"""
+            
+            # Inserir comentário após a tag <head> se existir
+            if '<head>' in fixed_html:
+                fixed_html = fixed_html.replace('<head>', f'<head>{clone_comment}')
+            else:
+                fixed_html = clone_comment + fixed_html
+            
+            with open(f"{self.clone_directory}/index.html", 'w', encoding='utf-8', errors='ignore') as f:
                 f.write(fixed_html)
 
             # 7. Criar arquivos de configuração
@@ -206,6 +223,8 @@ class AdvancedWebsiteCloner:
                 ]
                 
                 self.session.headers['User-Agent'] = random.choice(user_agents)
+                # Garantir que o servidor saiba que aceitamos conteúdo comprimido
+                self.session.headers['Accept-Encoding'] = 'gzip, deflate, br'
                 
                 # Adicionar delay aleatório
                 if attempt > 0:
@@ -215,8 +234,29 @@ class AdvancedWebsiteCloner:
                 response = self.session.get(url, timeout=30, allow_redirects=True, verify=False)
                 response.raise_for_status()
                 
+                # Verificar encoding e decodificar automaticamente
                 content = response.text
+                
+                # Verificar se o conteúdo foi decodificado corretamente
+                if content and not content.startswith(('<!DOCTYPE', '<html', '<HTML')):
+                    # Tentar diferentes encodings se o conteúdo não parecer HTML
+                    for encoding in ['utf-8', 'iso-8859-1', 'windows-1252']:
+                        try:
+                            response.encoding = encoding
+                            content = response.text
+                            if content and (content.startswith(('<!DOCTYPE', '<html', '<HTML')) or 
+                                          '<title>' in content.lower() or '<body>' in content.lower()):
+                                break
+                        except:
+                            continue
+                
                 print(f"✅ HTML baixado: {len(content)} caracteres")
+                
+                # Verificar se o conteúdo é válido
+                if len(content) < 100 or not any(tag in content.lower() for tag in ['<html', '<body', '<head', '<title']):
+                    print(f"⚠️ Conteúdo pode estar corrompido ou não ser HTML válido")
+                    if attempt < retries - 1:
+                        continue
                 
                 return content
                 
@@ -275,14 +315,20 @@ class AdvancedWebsiteCloner:
             'img[src]', 'img[data-src]', 'img[data-lazy]', 'img[data-original]',
             'picture source[srcset]', 'picture source[data-srcset]',
             '[style*="background-image"]', '[data-background]',
-            'svg image[href]', 'svg image[xlink:href]'
+            'svg image[href]'
         ]
         
         for selector in img_selectors:
             elements = soup.select(selector)
             for element in elements:
                 # Múltiplos atributos possíveis
-                src_attrs = ['src', 'data-src', 'data-lazy', 'data-original', 'href', 'xlink:href']
+                src_attrs = ['src', 'data-src', 'data-lazy', 'data-original', 'href']
+                
+                # Verificar xlink:href separadamente
+                xlink_href = element.get('xlink:href') or element.get('{http://www.w3.org/1999/xlink}href')
+                if xlink_href and not xlink_href.startswith('data:'):
+                    full_url = urljoin(base_url, xlink_href)
+                    resources.add(full_url)
                 
                 for attr in src_attrs:
                     src = element.get(attr)
@@ -598,7 +644,14 @@ class AdvancedWebsiteCloner:
                 if attempt > 0:
                     time.sleep(random.uniform(0.5, 1.5))
 
-                response = self.session.get(url, timeout=15, stream=True, verify=False)
+                # Headers específicos para diferentes tipos de arquivo
+                headers = self.session.headers.copy()
+                if url.endswith(('.css', '.js')):
+                    headers['Accept'] = 'text/css,*/*;q=0.1' if url.endswith('.css') else 'application/javascript,*/*;q=0.1'
+                elif url.endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg')):
+                    headers['Accept'] = 'image/webp,image/apng,image/*,*/*;q=0.8'
+
+                response = self.session.get(url, timeout=15, stream=True, verify=False, headers=headers)
                 response.raise_for_status()
 
                 # Determinar nome e pasta do arquivo
@@ -659,8 +712,19 @@ class AdvancedWebsiteCloner:
     def _process_css_file(self, css_filepath, css_url):
         """Processa arquivo CSS para extrair e baixar recursos internos"""
         try:
-            with open(css_filepath, 'r', encoding='utf-8', errors='ignore') as f:
-                css_content = f.read()
+            # Tentar diferentes encodings para ler o CSS
+            css_content = None
+            for encoding in ['utf-8', 'iso-8859-1', 'windows-1252']:
+                try:
+                    with open(css_filepath, 'r', encoding=encoding, errors='ignore') as f:
+                        css_content = f.read()
+                    break
+                except:
+                    continue
+            
+            if not css_content:
+                print(f"⚠️ Não foi possível ler o arquivo CSS: {css_filepath}")
+                return
 
             # Extrair URLs do CSS
             url_pattern = r'url\([\'"]?([^\'")]+)[\'"]?\)'
@@ -678,7 +742,9 @@ class AdvancedWebsiteCloner:
 
             # Atualizar caminhos no CSS
             updated_css = self._fix_css_paths_advanced(css_content, css_url)
-            with open(css_filepath, 'w', encoding='utf-8') as f:
+            
+            # Salvar com encoding UTF-8
+            with open(css_filepath, 'w', encoding='utf-8', errors='ignore') as f:
                 f.write(updated_css)
 
         except Exception as e:
@@ -850,9 +916,13 @@ AddType image/svg+xml .svg
             f.write(htaccess_content)
 
     def _create_zip_archive(self, output_name, timestamp):
-        """Cria arquivo ZIP otimizado"""
+        """Cria arquivo ZIP temporário (será deletado após envio)"""
+        # Criar ZIP temporário que será deletado após uso
         zip_filename = f"{output_name}_COMPLETE_{timestamp}.zip"
-        zip_path = f"cloned_sites/{zip_filename}"
+        zip_path = f"temp/{zip_filename}"
+        
+        # Garantir que o diretório temp existe
+        os.makedirs("temp", exist_ok=True)
 
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zipf:
             for root, dirs, files in os.walk(self.clone_directory):
@@ -911,21 +981,36 @@ if __name__ == "__main__":
     
     print("🚀 Iniciando clonagem AVANÇADA...")
     cloner = AdvancedWebsiteCloner()
-    result = cloner.clone_website(url, max_depth=3)
+    result = cloner.clone_website(url, max_depth=2)
 
     if result.get('success'):
         print("\n" + "="*80)
         print("✅ CLONAGEM AVANÇADA CONCLUÍDA COM SUCESSO!")
         print("="*80)
+        print(f"🌐 Site original: {result['original_url']}")
         print(f"📁 Arquivo ZIP: {result['zip_file']}")
         print(f"📊 Tamanho: {result['zip_size_mb']} MB")
-        print(f"📄 Arquivos HTML: {result['statistics']['html_files']}")
-        print(f"🎨 Arquivos CSS: {result['statistics']['css_files']}")
-        print(f"⚡ Arquivos JS: {result['statistics']['js_files']}")
-        print(f"🖼️ Imagens: {result['statistics']['images']}")
-        print(f"🔤 Fontes: {result['statistics']['fonts']}")
-        print(f"📁 Outros: {result['statistics']['other_files']}")
-        print(f"❌ Falhas: {result['statistics']['failed_downloads']}")
-        print(f"📈 Taxa de sucesso: {result['statistics']['success_rate']}%")
+        
+        stats = result['statistics']
+        print(f"📄 Arquivos HTML: {stats['html_files']}")
+        print(f"🎨 Arquivos CSS: {stats['css_files']}")
+        print(f"⚡ Arquivos JS: {stats['js_files']}")
+        print(f"🖼️ Imagens: {stats['images']}")
+        print(f"🔤 Fontes: {stats['fonts']}")
+        print(f"📁 Outros: {stats['other_files']}")
+        print(f"📈 Total de arquivos: {stats['total_files']}")
+        print(f"💾 Tamanho total: {stats['total_size_mb']} MB")
+        print(f"❌ Falhas: {stats['failed_downloads']}")
+        print(f"✅ Taxa de sucesso: {stats['success_rate']}%")
+        
+        # Mostrar algumas URLs que falharam
+        if result.get('failed_urls'):
+            print(f"\n⚠️ Primeiras URLs que falharam:")
+            for i, failed_url in enumerate(result['failed_urls'][:5]):
+                print(f"  {i+1}. {failed_url}")
+            if len(result['failed_urls']) > 5:
+                print(f"  ... e mais {len(result['failed_urls']) - 5} URLs")
+                
+        print(f"\n🌐 Extraia o arquivo e abra index.html no navegador!")
     else:
         print(f"❌ Erro: {result.get('error')}")
