@@ -4,27 +4,25 @@ import os
 import zipfile
 import re
 import time
-from urllib.parse import urljoin, urlparse, unquote
+from urllib.parse import urljoin, urlparse, unquote, quote
 from bs4 import BeautifulSoup
 import mimetypes
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import hashlib
 from datetime import datetime
 import json
+import urllib3
+from urllib3.exceptions import InsecureRequestWarning
+import random
 
-class ProfessionalWebsiteCloner:
+# Desabilitar warnings SSL
+urllib3.disable_warnings(InsecureRequestWarning)
+
+class AdvancedWebsiteCloner:
     def __init__(self):
         self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-US;q=0.7',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Cache-Control': 'max-age=0',
-            'Upgrade-Insecure-Requests': '1'
-        })
-
+        self.setup_session()
+        
         self.downloaded_files = set()
         self.failed_downloads = []
         self.clone_directory = ""
@@ -40,12 +38,40 @@ class ProfessionalWebsiteCloner:
             'fonts': 0,
             'other_files': 0,
             'total_size': 0,
-            'failed_downloads': 0
+            'failed_downloads': 0,
+            'scraped_urls': 0
         }
 
-    def clone_website(self, url, output_name=None, max_depth=2, include_external=False):
-        """Clona um site completamente"""
-        print(f"🚀 Iniciando clonagem profissional de: {url}")
+    def setup_session(self):
+        """Configura a sessão com headers avançados para bypass de proteções"""
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/120.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/120.0'
+        ]
+        
+        self.session.headers.update({
+            'User-Agent': random.choice(user_agents),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8,en-US;q=0.7,es;q=0.6',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Cache-Control': 'max-age=0',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'sec-ch-ua': '"Chromium";v="120", "Not(A:Brand";v="24", "Google Chrome";v="120"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"'
+        })
+
+    def clone_website(self, url, output_name=None, max_depth=3, include_external=True):
+        """Clona um site de forma extremamente completa"""
+        print(f"🚀 Iniciando clonagem AVANÇADA de: {url}")
 
         # Preparar diretórios
         parsed_url = urlparse(url)
@@ -53,334 +79,443 @@ class ProfessionalWebsiteCloner:
         self.base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
 
         if not output_name:
-            output_name = self.domain.replace('.', '_')
+            output_name = self.domain.replace('.', '_').replace('-', '_')
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.clone_directory = f"cloned_sites/{output_name}_{timestamp}"
 
-        # Criar estrutura de diretórios
+        # Criar estrutura completa de diretórios
+        directories = [
+            'assets', 'css', 'js', 'images', 'fonts', 'pages', 'data',
+            'uploads', 'media', 'downloads', 'files', 'docs', 'api',
+            'includes', 'components', 'modules', 'plugins', 'themes'
+        ]
+        
         os.makedirs(self.clone_directory, exist_ok=True)
-        os.makedirs(f"{self.clone_directory}/assets", exist_ok=True)
-        os.makedirs(f"{self.clone_directory}/css", exist_ok=True)
-        os.makedirs(f"{self.clone_directory}/js", exist_ok=True)
-        os.makedirs(f"{self.clone_directory}/images", exist_ok=True)
-        os.makedirs(f"{self.clone_directory}/fonts", exist_ok=True)
-        os.makedirs(f"{self.clone_directory}/pages", exist_ok=True)
+        for dir_name in directories:
+            os.makedirs(f"{self.clone_directory}/{dir_name}", exist_ok=True)
 
         try:
-            # 1. Baixar página principal
+            # 1. Download da página principal com múltiplas tentativas
             print("📄 Baixando página principal...")
-            main_html = self._download_html(url)
+            main_html = self._download_html_advanced(url)
             if not main_html:
                 return {"error": "Não foi possível baixar a página principal"}
 
-            # 2. Analisar e extrair recursos
-            print("🔍 Analisando recursos da página...")
+            # 2. Análise profunda de recursos
+            print("🔍 Executando análise PROFUNDA de recursos...")
             soup = BeautifulSoup(main_html, 'html.parser')
-            resources = self._extract_all_resources(soup, url)
+            
+            # Extrair TODOS os recursos possíveis
+            all_resources = set()
+            
+            # Recursos básicos
+            basic_resources = self._extract_basic_resources(soup, url)
+            all_resources.update(basic_resources)
+            
+            # Recursos do JavaScript inline
+            js_resources = self._extract_js_resources(main_html, url)
+            all_resources.update(js_resources)
+            
+            # Recursos do CSS inline
+            css_resources = self._extract_css_resources(main_html, url)
+            all_resources.update(css_resources)
+            
+            # Recursos de atributos data-*
+            data_resources = self._extract_data_attributes(soup, url)
+            all_resources.update(data_resources)
+            
+            # Recursos comuns por força bruta
+            common_resources = self._discover_common_files(url)
+            all_resources.update(common_resources)
+            
+            # Sitemap e robots.txt
+            sitemap_resources = self._extract_from_sitemap(url)
+            all_resources.update(sitemap_resources)
 
-            # 3. Baixar todos os recursos em paralelo
-            print(f"⬇️ Baixando {len(resources)} recursos...")
-            self._download_resources_parallel(resources)
+            print(f"📊 TOTAL DE RECURSOS DESCOBERTOS: {len(all_resources)}")
 
-            # 4. Se depth > 1, buscar páginas internas
+            # 3. Download paralelo com retry
+            print(f"⬇️ Baixando {len(all_resources)} recursos...")
+            self._download_resources_with_retry(list(all_resources))
+
+            # 4. Buscar páginas internas recursivamente
             if max_depth > 1:
-                print("🔗 Buscando páginas internas...")
-                internal_pages = self._find_internal_pages(soup, url, max_depth)
+                print("🔗 Buscando páginas internas recursivamente...")
+                internal_pages = self._find_internal_pages_recursive(soup, url, max_depth)
+                
                 for page_url in internal_pages:
-                    page_html = self._download_html(page_url)
+                    print(f"📄 Processando página: {page_url}")
+                    page_html = self._download_html_advanced(page_url)
                     if page_html:
-                        page_name = self._get_safe_filename(page_url)
-                        with open(f"{self.clone_directory}/pages/{page_name}.html", 'w', encoding='utf-8') as f:
+                        # Salvar página
+                        page_name = self._get_safe_filename(page_url, '.html')
+                        page_path = f"{self.clone_directory}/pages/{page_name}"
+                        
+                        with open(page_path, 'w', encoding='utf-8') as f:
                             f.write(self._fix_html_paths(page_html, page_url))
-
-                        # Extrair recursos adicionais das páginas internas
+                        
+                        self.clone_stats['html_files'] += 1
+                        
+                        # Extrair recursos adicionais
                         page_soup = BeautifulSoup(page_html, 'html.parser')
-                        page_resources = self._extract_all_resources(page_soup, page_url)
-                        self._download_resources_parallel(page_resources)
+                        page_resources = self._extract_all_page_resources(page_soup, page_url)
+                        self._download_resources_with_retry(page_resources)
 
-            # 5. Processar e salvar HTML principal com caminhos corrigidos
+            # 5. Tentar extrair recursos de APIs conhecidas
+            print("🔍 Buscando APIs e endpoints...")
+            api_resources = self._discover_api_endpoints(url)
+            if api_resources:
+                self._download_resources_with_retry(api_resources)
+
+            # 6. Processar e salvar HTML principal
             print("🔧 Processando HTML principal...")
-            fixed_html = self._fix_html_paths(main_html, url)
+            fixed_html = self._fix_html_paths_advanced(main_html, url)
             with open(f"{self.clone_directory}/index.html", 'w', encoding='utf-8') as f:
                 f.write(fixed_html)
 
-            # 6. Criar arquivo de configuração
-            self._create_config_file(url)
+            # 7. Criar arquivos de configuração
+            self._create_advanced_config(url)
 
-            # 7. Criar arquivo ZIP
+            # 8. Criar arquivo .htaccess para funcionamento offline
+            self._create_htaccess()
+
+            # 9. Criar arquivo ZIP
             print("📦 Criando arquivo ZIP...")
             zip_path = self._create_zip_archive(output_name, timestamp)
 
-            # 8. Gerar relatório
-            report = self._generate_report(url, zip_path)
+            # 10. Gerar relatório detalhado
+            report = self._generate_advanced_report(url, zip_path)
 
-            print("✅ Clonagem concluída com sucesso!")
+            print("✅ Clonagem AVANÇADA concluída com sucesso!")
             return report
 
         except Exception as e:
+            print(f"❌ Erro na clonagem: {e}")
             return {"error": f"Erro na clonagem: {str(e)}"}
 
-    def _download_html(self, url):
-        """Baixa o HTML de uma página"""
-        try:
-            response = self.session.get(url, timeout=30)
-            response.raise_for_status()
-            return response.text
-        except Exception as e:
-            print(f"❌ Erro ao baixar HTML de {url}: {e}")
-            return None
+    def _download_html_advanced(self, url, retries=3):
+        """Download avançado de HTML com múltiplas tentativas e bypass"""
+        for attempt in range(retries):
+            try:
+                # Rotacionar User-Agent
+                user_agents = [
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+                    'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/120.0'
+                ]
+                
+                self.session.headers['User-Agent'] = random.choice(user_agents)
+                
+                # Adicionar delay aleatório
+                if attempt > 0:
+                    time.sleep(random.uniform(1, 3))
+                
+                print(f"📥 Tentativa {attempt + 1} - Baixando: {url}")
+                response = self.session.get(url, timeout=30, allow_redirects=True, verify=False)
+                response.raise_for_status()
+                
+                content = response.text
+                print(f"✅ HTML baixado: {len(content)} caracteres")
+                
+                return content
+                
+            except Exception as e:
+                print(f"❌ Tentativa {attempt + 1} falhou: {e}")
+                if attempt == retries - 1:
+                    print(f"❌ Todas as tentativas falharam para: {url}")
+                    return None
 
-    def _extract_all_resources(self, soup, base_url):
-        """Extrai todos os recursos da página"""
-        resources = []
+    def _extract_basic_resources(self, soup, base_url):
+        """Extrai recursos básicos de forma mais abrangente"""
+        resources = set()
+        
+        # CSS - Busca mais abrangente
+        css_selectors = [
+            'link[rel="stylesheet"]',
+            'link[type="text/css"]',
+            'link[rel="preload"][as="style"]',
+            'style'
+        ]
+        
+        for selector in css_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                if element.name == 'link':
+                    href = element.get('href')
+                    if href:
+                        full_url = urljoin(base_url, href)
+                        resources.add(full_url)
+                elif element.name == 'style':
+                    # CSS inline - extrair URLs
+                    css_content = element.get_text()
+                    css_urls = re.findall(r'url\([\'"]?([^\'")]+)[\'"]?\)', css_content)
+                    for css_url in css_urls:
+                        if not css_url.startswith('data:'):
+                            full_url = urljoin(base_url, css_url)
+                            resources.add(full_url)
 
-        # CSS files
-        for link in soup.find_all('link', rel='stylesheet'):
-            href = link.get('href')
-            if href:
-                full_url = urljoin(base_url, href)
-                resources.append({
-                    'url': full_url,
-                    'type': 'css',
-                    'element': link
-                })
-
-        # JavaScript files
-        for script in soup.find_all('script', src=True):
-            src = script.get('src')
-            if src:
-                full_url = urljoin(base_url, src)
-                resources.append({
-                    'url': full_url,
-                    'type': 'js',
-                    'element': script
-                })
-
-        # Images
-        for img in soup.find_all('img', src=True):
-            src = img.get('src')
-            if src:
-                full_url = urljoin(base_url, src)
-                resources.append({
-                    'url': full_url,
-                    'type': 'image',
-                    'element': img
-                })
-
-        # Background images em CSS inline
-        for element in soup.find_all(style=True):
-            style = element.get('style', '')
-            bg_matches = re.findall(r'background-image:\s*url\([\'"]?([^\'")]+)[\'"]?\)', style)
-            for bg_url in bg_matches:
-                full_url = urljoin(base_url, bg_url)
-                resources.append({
-                    'url': full_url,
-                    'type': 'image',
-                    'element': element
-                })
-
-        # Fontes
-        for link in soup.find_all('link'):
-            href = link.get('href', '')
-            if any(font_ext in href.lower() for font_ext in ['.woff', '.woff2', '.ttf', '.otf', '.eot']):
-                full_url = urljoin(base_url, href)
-                resources.append({
-                    'url': full_url,
-                    'type': 'font',
-                    'element': link
-                })
-
-        # Favicon
-        for link in soup.find_all('link', rel=['icon', 'shortcut icon', 'apple-touch-icon']):
-            href = link.get('href')
-            if href:
-                full_url = urljoin(base_url, href)
-                resources.append({
-                    'url': full_url,
-                    'type': 'image',
-                    'element': link
-                })
-
-        # Videos e audios
-        for media in soup.find_all(['video', 'audio']):
-            src = media.get('src')
-            if src:
-                full_url = urljoin(base_url, src)
-                resources.append({
-                    'url': full_url,
-                    'type': 'media',
-                    'element': media
-                })
-
-            # Sources dentro de video/audio
-            for source in media.find_all('source'):
-                src = source.get('src')
+        # JavaScript - Busca mais abrangente
+        js_selectors = [
+            'script[src]',
+            'script[type="module"]',
+            'script[type="importmap"]'
+        ]
+        
+        for selector in js_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                src = element.get('src')
                 if src:
                     full_url = urljoin(base_url, src)
-                    resources.append({
-                        'url': full_url,
-                        'type': 'media',
-                        'element': source
-                    })
+                    resources.add(full_url)
 
-        return resources
+        # Imagens - Todos os tipos possíveis
+        img_selectors = [
+            'img[src]', 'img[data-src]', 'img[data-lazy]', 'img[data-original]',
+            'picture source[srcset]', 'picture source[data-srcset]',
+            '[style*="background-image"]', '[data-background]',
+            'svg image[href]', 'svg image[xlink:href]'
+        ]
+        
+        for selector in img_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                # Múltiplos atributos possíveis
+                src_attrs = ['src', 'data-src', 'data-lazy', 'data-original', 'href', 'xlink:href']
+                
+                for attr in src_attrs:
+                    src = element.get(attr)
+                    if src and not src.startswith('data:'):
+                        # Processar srcset se houver
+                        if 'srcset' in attr or attr == 'srcset':
+                            urls = re.findall(r'([^\s,]+)', src)
+                            for url in urls:
+                                if not url.startswith(('http', 'data:')):
+                                    full_url = urljoin(base_url, url)
+                                    resources.add(full_url)
+                        else:
+                            full_url = urljoin(base_url, src)
+                            resources.add(full_url)
 
-    def _download_resources_parallel(self, resources):
-        """Baixa recursos em paralelo"""
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            future_to_resource = {
-                executor.submit(self._download_resource, resource): resource 
-                for resource in resources
-            }
+                # Background images no style
+                style = element.get('style', '')
+                if 'background-image' in style:
+                    bg_urls = re.findall(r'background-image:\s*url\([\'"]?([^\'")]+)[\'"]?\)', style)
+                    for bg_url in bg_urls:
+                        if not bg_url.startswith('data:'):
+                            full_url = urljoin(base_url, bg_url)
+                            resources.add(full_url)
 
-            for future in as_completed(future_to_resource):
-                resource = future_to_resource[future]
-                try:
-                    result = future.result()
-                    if result:
-                        self.downloaded_count += 1
-                        print(f"✅ [{self.downloaded_count}/{len(resources)}] {resource['url']}")
-                    else:
-                        self.failed_downloads.append(resource['url'])
-                        self.clone_stats['failed_downloads'] += 1
-                except Exception as e:
-                    print(f"❌ Erro ao baixar {resource['url']}: {e}")
-                    self.failed_downloads.append(resource['url'])
-                    self.clone_stats['failed_downloads'] += 1
+        # Vídeos e áudios
+        media_selectors = [
+            'video[src]', 'video source[src]', 'video[poster]',
+            'audio[src]', 'audio source[src]',
+            'embed[src]', 'object[data]', 'iframe[src]'
+        ]
+        
+        for selector in media_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                src_attrs = ['src', 'data', 'poster']
+                for attr in src_attrs:
+                    src = element.get(attr)
+                    if src and not src.startswith(('data:', 'javascript:', 'mailto:')):
+                        full_url = urljoin(base_url, src)
+                        resources.add(full_url)
 
-    def _download_resource(self, resource):
-        """Baixa um recurso específico"""
-        url = resource['url']
-        resource_type = resource['type']
+        # Fonts e ícones
+        font_selectors = [
+            'link[rel="preload"][as="font"]',
+            'link[rel="icon"]', 'link[rel="shortcut icon"]',
+            'link[rel="apple-touch-icon"]', 'link[rel="mask-icon"]'
+        ]
+        
+        for selector in font_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                href = element.get('href')
+                if href:
+                    full_url = urljoin(base_url, href)
+                    resources.add(full_url)
 
-        if url in self.downloaded_files:
-            return True
+        return list(resources)
 
-        try:
-            response = self.session.get(url, timeout=15, stream=True)
-            response.raise_for_status()
+    def _extract_js_resources(self, html_content, base_url):
+        """Extrai recursos do JavaScript inline"""
+        resources = set()
+        
+        # Padrões para URLs em JavaScript
+        js_patterns = [
+            r'["\']([^"\']+\.(?:js|css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot))["\']',
+            r'src\s*[:=]\s*["\']([^"\']+)["\']',
+            r'href\s*[:=]\s*["\']([^"\']+)["\']',
+            r'url\s*[:=]\s*["\']([^"\']+)["\']',
+            r'ajax\(["\']([^"\']+)["\']',
+            r'fetch\(["\']([^"\']+)["\']',
+            r'XMLHttpRequest.*["\']([^"\']+)["\']'
+        ]
+        
+        for pattern in js_patterns:
+            matches = re.findall(pattern, html_content, re.IGNORECASE)
+            for match in matches:
+                if not match.startswith(('data:', 'javascript:', 'mailto:', '#')):
+                    full_url = urljoin(base_url, match)
+                    resources.add(full_url)
+        
+        return list(resources)
 
-            # Determinar nome e pasta do arquivo
-            filename = self._get_safe_filename(url)
-
-            if resource_type == 'css':
-                filepath = f"{self.clone_directory}/css/{filename}"
-                self.clone_stats['css_files'] += 1
-            elif resource_type == 'js':
-                filepath = f"{self.clone_directory}/js/{filename}"
-                self.clone_stats['js_files'] += 1
-            elif resource_type == 'image':
-                filepath = f"{self.clone_directory}/images/{filename}"
-                self.clone_stats['images'] += 1
-            elif resource_type == 'font':
-                filepath = f"{self.clone_directory}/fonts/{filename}"
-                self.clone_stats['fonts'] += 1
-            else:
-                filepath = f"{self.clone_directory}/assets/{filename}"
-                self.clone_stats['other_files'] += 1
-
-            # Baixar arquivo
-            with open(filepath, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-
-            self.clone_stats['total_size'] += os.path.getsize(filepath)
-            self.downloaded_files.add(url)
-
-            # Se for CSS, baixar recursos do CSS também
-            if resource_type == 'css':
-                self._download_css_resources(filepath, url)
-
-            return True
-
-        except Exception as e:
-            print(f"❌ Falha ao baixar {url}: {e}")
-            return False
-
-    def _download_css_resources(self, css_filepath, css_url):
-        """Baixa recursos referenciados em arquivos CSS"""
-        try:
-            with open(css_filepath, 'r', encoding='utf-8', errors='ignore') as f:
-                css_content = f.read()
-
-            # Buscar URLs em CSS
-            url_pattern = r'url\([\'"]?([^\'")]+)[\'"]?\)'
-            urls = re.findall(url_pattern, css_content)
-
+    def _extract_css_resources(self, html_content, base_url):
+        """Extrai recursos do CSS inline"""
+        resources = set()
+        
+        # Extrair CSS entre tags <style>
+        css_blocks = re.findall(r'<style[^>]*>(.*?)</style>', html_content, re.DOTALL | re.IGNORECASE)
+        
+        for css_block in css_blocks:
+            # URLs em CSS
+            urls = re.findall(r'url\([\'"]?([^\'")]+)[\'"]?\)', css_block)
             for url in urls:
-                if not url.startswith(('data:', 'http')):
-                    full_url = urljoin(css_url, url)
-                    resource = {
-                        'url': full_url,
-                        'type': 'font' if any(ext in url.lower() for ext in ['.woff', '.woff2', '.ttf', '.otf']) else 'image',
-                        'element': None
-                    }
-                    self._download_resource(resource)
+                if not url.startswith('data:'):
+                    full_url = urljoin(base_url, url)
+                    resources.add(full_url)
+        
+        return list(resources)
 
-            # Atualizar caminhos no CSS
-            updated_css = self._fix_css_paths(css_content, css_url)
-            with open(css_filepath, 'w', encoding='utf-8') as f:
-                f.write(updated_css)
+    def _extract_data_attributes(self, soup, base_url):
+        """Extrai recursos de atributos data-*"""
+        resources = set()
+        
+        # Buscar todos os elementos com atributos data-*
+        all_elements = soup.find_all()
+        
+        for element in all_elements:
+            for attr_name, attr_value in element.attrs.items():
+                if attr_name.startswith('data-') and isinstance(attr_value, str):
+                    # Verificar se parece com uma URL
+                    if any(ext in attr_value.lower() for ext in ['.js', '.css', '.png', '.jpg', '.gif', '.svg', '.woff', '.pdf']):
+                        if not attr_value.startswith(('data:', 'javascript:', 'mailto:')):
+                            full_url = urljoin(base_url, attr_value)
+                            resources.add(full_url)
+        
+        return list(resources)
 
-        except Exception as e:
-            print(f"❌ Erro ao processar CSS {css_filepath}: {e}")
+    def _discover_common_files(self, base_url):
+        """Descobre arquivos comuns por força bruta"""
+        resources = set()
+        
+        common_paths = [
+            # CSS
+            '/css/style.css', '/css/main.css', '/css/app.css', '/css/bootstrap.css',
+            '/css/custom.css', '/css/theme.css', '/css/responsive.css',
+            '/assets/css/style.css', '/assets/css/main.css',
+            '/static/css/style.css', '/static/css/main.css',
+            
+            # JavaScript
+            '/js/main.js', '/js/app.js', '/js/script.js', '/js/custom.js',
+            '/js/jquery.js', '/js/bootstrap.js', '/js/plugins.js',
+            '/assets/js/main.js', '/assets/js/app.js',
+            '/static/js/main.js', '/static/js/app.js',
+            
+            # Imagens
+            '/images/logo.png', '/images/logo.jpg', '/images/logo.svg',
+            '/img/logo.png', '/img/logo.jpg', '/img/logo.svg',
+            '/assets/images/logo.png', '/assets/img/logo.png',
+            '/static/images/logo.png', '/static/img/logo.png',
+            
+            # Ícones
+            '/favicon.ico', '/favicon.png', '/apple-touch-icon.png',
+            '/icon-192x192.png', '/icon-512x512.png',
+            
+            # Arquivos de configuração
+            '/robots.txt', '/sitemap.xml', '/sitemap.txt',
+            '/manifest.json', '/.well-known/security.txt',
+            
+            # Uploads e media
+            '/uploads/', '/media/', '/files/', '/documents/', '/downloads/'
+        ]
+        
+        print(f"🔍 Testando {len(common_paths)} caminhos comuns...")
+        
+        for path in common_paths:
+            try:
+                test_url = urljoin(base_url, path)
+                response = self.session.head(test_url, timeout=5, verify=False)
+                if response.status_code == 200:
+                    resources.add(test_url)
+                    print(f"  ✅ Encontrado: {path}")
+            except:
+                continue
+        
+        return list(resources)
 
-    def _fix_html_paths(self, html_content, base_url):
-        """Corrige caminhos no HTML para arquivos locais"""
-        soup = BeautifulSoup(html_content, 'html.parser')
+    def _extract_from_sitemap(self, base_url):
+        """Extrai URLs do sitemap.xml"""
+        resources = set()
+        
+        sitemap_urls = [
+            '/sitemap.xml',
+            '/sitemap.txt',
+            '/sitemap_index.xml',
+            '/sitemaps.xml'
+        ]
+        
+        for sitemap_path in sitemap_urls:
+            try:
+                sitemap_url = urljoin(base_url, sitemap_path)
+                response = self.session.get(sitemap_url, timeout=10, verify=False)
+                if response.status_code == 200:
+                    print(f"📄 Processando sitemap: {sitemap_path}")
+                    
+                    # XML sitemap
+                    if sitemap_path.endswith('.xml'):
+                        urls = re.findall(r'<loc>(.*?)</loc>', response.text)
+                        resources.update(urls)
+                    
+                    # TXT sitemap
+                    elif sitemap_path.endswith('.txt'):
+                        lines = response.text.strip().split('\n')
+                        for line in lines:
+                            if line.strip() and line.startswith('http'):
+                                resources.add(line.strip())
+                                
+            except:
+                continue
+                
+        return list(resources)
 
-        # Corrigir links CSS
-        for link in soup.find_all('link', rel='stylesheet'):
-            href = link.get('href')
-            if href:
-                filename = self._get_safe_filename(urljoin(base_url, href))
-                link['href'] = f'css/{filename}'
+    def _discover_api_endpoints(self, base_url):
+        """Tenta descobrir endpoints de API"""
+        resources = set()
+        
+        api_paths = [
+            '/api/', '/api/v1/', '/api/v2/', '/v1/', '/v2/',
+            '/graphql', '/graphql/', '/rest/', '/rest/v1/',
+            '/wp-json/', '/wp-json/wp/v2/',
+            '/.well-known/', '/health', '/status'
+        ]
+        
+        for api_path in api_paths:
+            try:
+                api_url = urljoin(base_url, api_path)
+                response = self.session.get(api_url, timeout=5, verify=False)
+                if response.status_code == 200:
+                    resources.add(api_url)
+                    print(f"  🔌 API encontrada: {api_path}")
+            except:
+                continue
+                
+        return list(resources)
 
-        # Corrigir scripts
-        for script in soup.find_all('script', src=True):
-            src = script.get('src')
-            if src:
-                filename = self._get_safe_filename(urljoin(base_url, src))
-                script['src'] = f'js/{filename}'
-
-        # Corrigir imagens
-        for img in soup.find_all('img', src=True):
-            src = img.get('src')
-            if src:
-                filename = self._get_safe_filename(urljoin(base_url, src))
-                img['src'] = f'images/{filename}'
-
-        # Corrigir favicons
-        for link in soup.find_all('link', rel=['icon', 'shortcut icon']):
-            href = link.get('href')
-            if href:
-                filename = self._get_safe_filename(urljoin(base_url, href))
-                link['href'] = f'images/{filename}'
-
-        return str(soup)
-
-    def _fix_css_paths(self, css_content, css_url):
-        """Corrige caminhos em arquivos CSS"""
-        def replace_url(match):
-            url = match.group(1)
-            if not url.startswith(('data:', 'http')):
-                full_url = urljoin(css_url, url)
-                filename = self._get_safe_filename(full_url)
-                if any(ext in url.lower() for ext in ['.woff', '.woff2', '.ttf', '.otf']):
-                    return f'url(../fonts/{filename})'
-                else:
-                    return f'url(../images/{filename})'
-            return match.group(0)
-
-        return re.sub(r'url\([\'"]?([^\'")]+)[\'"]?\)', replace_url, css_content)
-
-    def _find_internal_pages(self, soup, base_url, max_depth):
-        """Encontra páginas internas do site"""
+    def _find_internal_pages_recursive(self, soup, base_url, max_depth, current_depth=1):
+        """Encontra páginas internas recursivamente"""
+        if current_depth >= max_depth:
+            return []
+            
         internal_pages = set()
         domain = urlparse(base_url).netloc
 
+        # Buscar todos os links
         for link in soup.find_all('a', href=True):
             href = link.get('href')
             if href:
@@ -390,59 +525,336 @@ class ProfessionalWebsiteCloner:
                 # Verificar se é página interna
                 if (parsed.netloc == domain and 
                     not parsed.fragment and 
-                    not full_url.endswith(('.pdf', '.zip', '.exe', '.jpg', '.png', '.gif'))):
+                    not full_url.endswith(('.pdf', '.zip', '.exe', '.jpg', '.png', '.gif', '.css', '.js'))):
                     internal_pages.add(full_url)
 
-                if len(internal_pages) >= 20:  # Limitar a 20 páginas
-                    break
+        # Limitar número de páginas para evitar sobrecarga
+        internal_pages = list(internal_pages)[:50]
+        
+        # Buscar recursivamente em algumas páginas
+        if current_depth < max_depth:
+            for page_url in internal_pages[:10]:  # Processar apenas as primeiras 10
+                try:
+                    page_html = self._download_html_advanced(page_url)
+                    if page_html:
+                        page_soup = BeautifulSoup(page_html, 'html.parser')
+                        deeper_pages = self._find_internal_pages_recursive(
+                            page_soup, page_url, max_depth, current_depth + 1
+                        )
+                        internal_pages.extend(deeper_pages)
+                except:
+                    continue
 
-        return list(internal_pages)
+        return list(set(internal_pages))
 
-    def _get_safe_filename(self, url):
-        """Gera nome de arquivo seguro a partir da URL"""
+    def _extract_all_page_resources(self, soup, base_url):
+        """Extrai todos os recursos de uma página"""
+        resources = set()
+        
+        # Combinar todos os métodos de extração
+        resources.update(self._extract_basic_resources(soup, base_url))
+        
+        page_html = str(soup)
+        resources.update(self._extract_js_resources(page_html, base_url))
+        resources.update(self._extract_css_resources(page_html, base_url))
+        resources.update(self._extract_data_attributes(soup, base_url))
+        
+        return list(resources)
+
+    def _download_resources_with_retry(self, resources):
+        """Download de recursos com retry e controle de erro"""
+        unique_resources = list(set(resources))
+        
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_resource = {
+                executor.submit(self._download_single_resource, resource): resource 
+                for resource in unique_resources
+            }
+
+            for future in as_completed(future_to_resource):
+                resource = future_to_resource[future]
+                try:
+                    result = future.result()
+                    if result:
+                        self.downloaded_count += 1
+                        if self.downloaded_count % 10 == 0:
+                            print(f"✅ [{self.downloaded_count}/{len(unique_resources)}] recursos baixados...")
+                    else:
+                        self.failed_downloads.append(resource)
+                        self.clone_stats['failed_downloads'] += 1
+                except Exception as e:
+                    print(f"❌ Erro ao baixar {resource}: {e}")
+                    self.failed_downloads.append(resource)
+                    self.clone_stats['failed_downloads'] += 1
+
+    def _download_single_resource(self, url, retries=3):
+        """Download de um único recurso com retry"""
+        if url in self.downloaded_files:
+            return True
+
+        for attempt in range(retries):
+            try:
+                # Delay entre tentativas
+                if attempt > 0:
+                    time.sleep(random.uniform(0.5, 1.5))
+
+                response = self.session.get(url, timeout=15, stream=True, verify=False)
+                response.raise_for_status()
+
+                # Determinar nome e pasta do arquivo
+                filename = self._get_safe_filename(url)
+                
+                # Determinar tipo e pasta baseado na extensão e content-type
+                content_type = response.headers.get('Content-Type', '').lower()
+                file_extension = os.path.splitext(filename)[1].lower()
+                
+                if file_extension in ['.css'] or 'css' in content_type:
+                    filepath = f"{self.clone_directory}/css/{filename}"
+                    self.clone_stats['css_files'] += 1
+                elif file_extension in ['.js'] or 'javascript' in content_type:
+                    filepath = f"{self.clone_directory}/js/{filename}"
+                    self.clone_stats['js_files'] += 1
+                elif file_extension in ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp'] or 'image' in content_type:
+                    filepath = f"{self.clone_directory}/images/{filename}"
+                    self.clone_stats['images'] += 1
+                elif file_extension in ['.woff', '.woff2', '.ttf', '.otf', '.eot'] or 'font' in content_type:
+                    filepath = f"{self.clone_directory}/fonts/{filename}"
+                    self.clone_stats['fonts'] += 1
+                elif file_extension in ['.mp4', '.webm', '.ogg', '.mp3', '.wav'] or any(x in content_type for x in ['video', 'audio']):
+                    filepath = f"{self.clone_directory}/media/{filename}"
+                    self.clone_stats['other_files'] += 1
+                elif file_extension in ['.pdf', '.doc', '.docx', '.txt']:
+                    filepath = f"{self.clone_directory}/docs/{filename}"
+                    self.clone_stats['other_files'] += 1
+                else:
+                    filepath = f"{self.clone_directory}/assets/{filename}"
+                    self.clone_stats['other_files'] += 1
+
+                # Criar diretório se necessário
+                os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+                # Baixar arquivo
+                with open(filepath, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+
+                file_size = os.path.getsize(filepath)
+                self.clone_stats['total_size'] += file_size
+                self.downloaded_files.add(url)
+
+                # Se for CSS, processar recursos internos
+                if file_extension == '.css':
+                    self._process_css_file(filepath, url)
+
+                return True
+
+            except Exception as e:
+                if attempt == retries - 1:
+                    print(f"❌ Falha final ao baixar {url}: {e}")
+                    return False
+
+        return False
+
+    def _process_css_file(self, css_filepath, css_url):
+        """Processa arquivo CSS para extrair e baixar recursos internos"""
+        try:
+            with open(css_filepath, 'r', encoding='utf-8', errors='ignore') as f:
+                css_content = f.read()
+
+            # Extrair URLs do CSS
+            url_pattern = r'url\([\'"]?([^\'")]+)[\'"]?\)'
+            urls = re.findall(url_pattern, css_content)
+
+            css_resources = []
+            for url in urls:
+                if not url.startswith(('data:', 'http')):
+                    full_url = urljoin(css_url, url)
+                    css_resources.append(full_url)
+
+            # Baixar recursos do CSS
+            if css_resources:
+                self._download_resources_with_retry(css_resources)
+
+            # Atualizar caminhos no CSS
+            updated_css = self._fix_css_paths_advanced(css_content, css_url)
+            with open(css_filepath, 'w', encoding='utf-8') as f:
+                f.write(updated_css)
+
+        except Exception as e:
+            print(f"❌ Erro ao processar CSS {css_filepath}: {e}")
+
+    def _fix_html_paths_advanced(self, html_content, base_url):
+        """Corrige caminhos no HTML de forma avançada"""
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        # Mapeamento de correções
+        path_mappings = {
+            'css': 'css/',
+            'js': 'js/',
+            'images': 'images/',
+            'fonts': 'fonts/',
+            'media': 'media/',
+            'docs': 'docs/',
+            'assets': 'assets/'
+        }
+
+        # Corrigir links CSS
+        for link in soup.find_all('link'):
+            href = link.get('href')
+            if href and not href.startswith(('data:', 'javascript:', '#')):
+                filename = self._get_safe_filename(urljoin(base_url, href))
+                file_ext = os.path.splitext(filename)[1].lower()
+                
+                if file_ext == '.css' or link.get('rel') == ['stylesheet']:
+                    link['href'] = f'css/{filename}'
+                elif file_ext in ['.ico', '.png', '.jpg']:
+                    link['href'] = f'images/{filename}'
+
+        # Corrigir scripts
+        for script in soup.find_all('script', src=True):
+            src = script.get('src')
+            if src and not src.startswith(('data:', 'javascript:')):
+                filename = self._get_safe_filename(urljoin(base_url, src))
+                script['src'] = f'js/{filename}'
+
+        # Corrigir imagens
+        for img in soup.find_all('img'):
+            for attr in ['src', 'data-src', 'data-lazy']:
+                src = img.get(attr)
+                if src and not src.startswith(('data:', 'javascript:')):
+                    filename = self._get_safe_filename(urljoin(base_url, src))
+                    img[attr] = f'images/{filename}'
+
+        # Corrigir vídeos e áudios
+        for media in soup.find_all(['video', 'audio', 'source']):
+            src = media.get('src')
+            if src and not src.startswith(('data:', 'javascript:')):
+                filename = self._get_safe_filename(urljoin(base_url, src))
+                media['src'] = f'media/{filename}'
+
+        return str(soup)
+
+    def _fix_css_paths_advanced(self, css_content, css_url):
+        """Corrige caminhos em arquivos CSS de forma avançada"""
+        def replace_url(match):
+            url = match.group(1)
+            if not url.startswith(('data:', 'http')):
+                full_url = urljoin(css_url, url)
+                filename = self._get_safe_filename(full_url)
+                file_ext = os.path.splitext(filename)[1].lower()
+                
+                if file_ext in ['.woff', '.woff2', '.ttf', '.otf', '.eot']:
+                    return f'url(../fonts/{filename})'
+                elif file_ext in ['.png', '.jpg', '.jpeg', '.gif', '.svg']:
+                    return f'url(../images/{filename})'
+                else:
+                    return f'url(../assets/{filename})'
+            return match.group(0)
+
+        return re.sub(r'url\([\'"]?([^\'")]+)[\'"]?\)', replace_url, css_content)
+
+    def _get_safe_filename(self, url, default_ext=''):
+        """Gera nome de arquivo seguro e único"""
         parsed = urlparse(url)
         filename = os.path.basename(parsed.path)
 
         if not filename or '.' not in filename:
             # Usar hash da URL se não houver nome de arquivo
             url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
-
-            # Tentar determinar extensão pelo Content-Type
-            try:
-                response = self.session.head(url, timeout=5)
-                content_type = response.headers.get('Content-Type', '')
-                ext = mimetypes.guess_extension(content_type.split(';')[0]) or '.html'
-                filename = f"file_{url_hash}{ext}"
-            except:
-                filename = f"file_{url_hash}.html"
+            
+            # Tentar determinar extensão
+            if default_ext:
+                ext = default_ext
+            else:
+                # Detectar por content-type ou URL
+                if '.css' in url:
+                    ext = '.css'
+                elif '.js' in url:
+                    ext = '.js'
+                elif any(x in url for x in ['.png', '.jpg', '.jpeg', '.gif']):
+                    ext = '.png'
+                else:
+                    ext = '.html'
+            
+            filename = f"file_{url_hash}{ext}"
 
         # Limpar caracteres inválidos
         filename = re.sub(r'[^\w\-_\.]', '_', filename)
+        
+        # Evitar nomes muito longos
+        if len(filename) > 100:
+            name, ext = os.path.splitext(filename)
+            filename = name[:90] + ext
+
         return filename
 
-    def _create_config_file(self, original_url):
-        """Cria arquivo de configuração com informações da clonagem"""
+    def _create_advanced_config(self, original_url):
+        """Cria arquivo de configuração avançado"""
         config = {
-            'original_url': original_url,
-            'clone_date': datetime.now().isoformat(),
-            'domain': self.domain,
-            'stats': self.clone_stats,
+            'clone_info': {
+                'original_url': original_url,
+                'clone_date': datetime.now().isoformat(),
+                'domain': self.domain,
+                'cloner_version': '2.0_advanced'
+            },
+            'statistics': self.clone_stats,
             'failed_downloads': self.failed_downloads,
+            'downloaded_count': self.downloaded_count,
             'instructions': {
                 'pt': 'Abra index.html no navegador para visualizar o site clonado',
                 'en': 'Open index.html in browser to view the cloned website'
-            }
+            },
+            'notes': [
+                'Este clone foi criado com o sistema avançado',
+                'Todos os recursos possíveis foram extraídos',
+                'Caminhos foram corrigidos para uso offline'
+            ]
         }
 
         with open(f"{self.clone_directory}/clone_info.json", 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
 
+    def _create_htaccess(self):
+        """Cria arquivo .htaccess para melhor funcionamento"""
+        htaccess_content = """# Arquivo gerado pelo Advanced Website Cloner
+DirectoryIndex index.html index.htm
+
+# Permitir acesso a todos os arquivos
+<Files "*">
+    Order allow,deny
+    Allow from all
+</Files>
+
+# Definir tipos MIME
+AddType text/css .css
+AddType application/javascript .js
+AddType image/png .png
+AddType image/jpeg .jpg .jpeg
+AddType image/gif .gif
+AddType image/svg+xml .svg
+
+# Cache
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+</IfModule>
+"""
+        
+        with open(f"{self.clone_directory}/.htaccess", 'w', encoding='utf-8') as f:
+            f.write(htaccess_content)
+
     def _create_zip_archive(self, output_name, timestamp):
-        """Cria arquivo ZIP com todo o site clonado"""
-        zip_filename = f"{output_name}_{timestamp}.zip"
+        """Cria arquivo ZIP otimizado"""
+        zip_filename = f"{output_name}_COMPLETE_{timestamp}.zip"
         zip_path = f"cloned_sites/{zip_filename}"
 
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as zipf:
             for root, dirs, files in os.walk(self.clone_directory):
                 for file in files:
                     file_path = os.path.join(root, file)
@@ -455,15 +867,16 @@ class ProfessionalWebsiteCloner:
 
         return zip_path
 
-    def _generate_report(self, original_url, zip_path):
-        """Gera relatório da clonagem"""
+    def _generate_advanced_report(self, original_url, zip_path):
+        """Gera relatório avançado da clonagem"""
         total_size_mb = self.clone_stats['total_size'] / (1024 * 1024)
+        zip_size_mb = os.path.getsize(zip_path) / (1024 * 1024)
 
         return {
             'success': True,
             'original_url': original_url,
             'zip_file': zip_path,
-            'zip_size_mb': round(os.path.getsize(zip_path) / (1024 * 1024), 2),
+            'zip_size_mb': round(zip_size_mb, 2),
             'statistics': {
                 'html_files': self.clone_stats['html_files'],
                 'css_files': self.clone_stats['css_files'],
@@ -480,27 +893,29 @@ class ProfessionalWebsiteCloner:
                     self.clone_stats['other_files']
                 ]),
                 'total_size_mb': round(total_size_mb, 2),
-                'failed_downloads': self.clone_stats['failed_downloads']
+                'failed_downloads': self.clone_stats['failed_downloads'],
+                'success_rate': round((self.downloaded_count / (self.downloaded_count + self.clone_stats['failed_downloads'])) * 100, 2) if (self.downloaded_count + self.clone_stats['failed_downloads']) > 0 else 100
             },
-            'failed_urls': self.failed_downloads[:10] if self.failed_downloads else []
+            'failed_urls': self.failed_downloads[:20] if self.failed_downloads else [],
+            'cloner_version': '2.0_advanced'
         }
 
-def clone_website_professional(url, output_name=None, max_depth=2):
-    """Função principal para clonagem profissional de sites"""
-    cloner = ProfessionalWebsiteCloner()
+def clone_website_professional(url, output_name=None, max_depth=3):
+    """Função principal para clonagem avançada de sites"""
+    cloner = AdvancedWebsiteCloner()
     return cloner.clone_website(url, output_name, max_depth)
 
 # Exemplo de uso
 if __name__ == "__main__":
     url = input("Digite a URL do site para clonar: ")
-
-    print("🚀 Iniciando clonagem profissional...")
-    cloner = ProfessionalWebsiteCloner()
-    result = cloner.clone_website(url, max_depth=2)
+    
+    print("🚀 Iniciando clonagem AVANÇADA...")
+    cloner = AdvancedWebsiteCloner()
+    result = cloner.clone_website(url, max_depth=3)
 
     if result.get('success'):
         print("\n" + "="*80)
-        print("✅ CLONAGEM CONCLUÍDA COM SUCESSO!")
+        print("✅ CLONAGEM AVANÇADA CONCLUÍDA COM SUCESSO!")
         print("="*80)
         print(f"📁 Arquivo ZIP: {result['zip_file']}")
         print(f"📊 Tamanho: {result['zip_size_mb']} MB")
@@ -511,5 +926,6 @@ if __name__ == "__main__":
         print(f"🔤 Fontes: {result['statistics']['fonts']}")
         print(f"📁 Outros: {result['statistics']['other_files']}")
         print(f"❌ Falhas: {result['statistics']['failed_downloads']}")
+        print(f"📈 Taxa de sucesso: {result['statistics']['success_rate']}%")
     else:
         print(f"❌ Erro: {result.get('error')}")
