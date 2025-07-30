@@ -14,8 +14,12 @@ import shutil
 import re
 import json
 import urllib3
+from urllib3.exceptions import InsecureRequestWarning
 from sseclient import SSEClient
 import requests
+
+# Desabilitar warnings SSL irritantes
+urllib3.disable_warnings(InsecureRequestWarning)
 import random
 from urllib.parse import urljoin, urlparse
 from difflib import SequenceMatcher
@@ -2072,6 +2076,7 @@ async def start_handler(event):
 📱 `/reportwpp` - Reports WhatsApp  
 🛡️ `/checker` - Checker Tools
 🎲 `/geradores` - Ferramentas de Geração
+👤 `/userinfo [user]` - Extrair info de usuário
 🔄 `/reset` - Resetar dados
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -4008,12 +4013,18 @@ async def callback_handler(event):
             "🌐 `/webscraper [url]` - Extrair dados do site\n"
             "   💡 Exemplo: `/webscraper example.com`\n"
             "   📧 Extrai emails, telefones e links\n\n"
+            "👤 `/userinfo [user]` - Extrair info de usuário\n"
+            "   💡 Exemplo: `/userinfo @username`\n"
+            "   🎯 Coleta dados públicos da conta\n\n"
             "🔍 `/api [url]` - Análise completa de APIs\n"
             "   💡 Exemplo: `/api api.site.com`\n"
             "   🎯 Encontra endpoints, docs, GraphQL, etc\n\n"
             "🔑 `/apikey [url]` - Buscar API Keys expostas\n"
             "   💡 Exemplo: `/apikey site.com`\n"
             "   🔑 Procura chaves e tokens expostos\n\n"
+            "🔒 `/vulnerabilidades [url]` - Scanner de vulnerabilidades\n"
+            "   💡 Exemplo: `/vulnerabilidades site.com`\n"
+            "   🛡️ Detecta falhas de segurança\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             "💡 **Dicas de uso:**\n"
             "• URLs podem ser com ou sem https://\n"
@@ -4023,6 +4034,8 @@ async def callback_handler(event):
             buttons=[
                 [Button.inline("🔍 Usar /search", data=f"cmd_search:{id_user_btn}"),
                  Button.inline("🌐 Usar /webscraper", data=f"cmd_webscraper:{id_user_btn}")],
+                [Button.inline("👤 Usar /userinfo", data=f"cmd_userinfo:{id_user_btn}"),
+                 Button.inline("🔒 Usar /vulnerabilidades", data=f"cmd_vulnerabilidades:{id_user_btn}")],
                 [Button.inline("🔙 Voltar às Áreas", data=f"show_commands:{id_user_btn}")],
                 [Button.inline("🗑️ Fechar", data=f"apagarmensagem:{id_user_btn}")]
             ]
@@ -4117,11 +4130,13 @@ async def callback_handler(event):
             "🏓 `/ping` - Verificar status do bot\n"
             "🔍 `/search [url]` - Buscar logins em sites\n"
             "🌐 `/webscraper [url]` - Extrair dados do site\n"
+            "👤 `/userinfo [user]` - Extrair info de usuário\n"
             "📝 `/report` - Enviar reports Telegram\n"
             "⚡ `/report2` - Sistema avançado de reports\n"
             "📱 `/reportwpp` - Reportar números WhatsApp\n"
             "🛠️ `/checker` - Ferramentas Checker\n"
             "🎲 `/geradores` - Ferramentas de Geração\n"
+            "🔒 `/vulnerabilidades [url]` - Scanner de vulnerabilidades\n"
             "🔄 `/reset` - Resetar todos os dados\n"
             "📋 `/comandos` - Ver esta lista\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -4379,6 +4394,62 @@ async def callback_handler(event):
             "• Ajuda contextual\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
             "💡 **Perfeito para iniciantes!**\n\n"
+            "🤖 @CatalystServerRobot",
+            buttons=[[Button.inline("🗑️ Fechar", data=f"apagarmensagem:{id_user_btn}")]]
+        )
+
+    elif acao == "cmd_userinfo":
+        await safe_edit_message(event,
+            "👤 **COMO USAR /userinfo**\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 **Uso simples:**\n"
+            "Digite `/userinfo [usuário]` seguido do alvo\n\n"
+            "🎯 **Formatos aceitos:**\n"
+            "• `/userinfo @username` - Por username\n"
+            "• `/userinfo username` - Sem @ também funciona\n"
+            "• `/userinfo 123456789` - Por ID numérico\n\n"
+            "🔍 **Informações extraídas:**\n"
+            "• 📋 Dados básicos (nome, username, ID)\n"
+            "• 📞 Telefone (se público)\n"
+            "• 📝 Biografia do perfil\n"
+            "• 🖼️ Foto de perfil\n"
+            "• ⚙️ Status e configurações\n"
+            "• 👥 Grupos em comum\n"
+            "• 🛡️ Análise de segurança\n"
+            "• ⏰ Última vez visto\n"
+            "• 🔒 Configurações de privacidade\n\n"
+            "💡 **Exemplo:**\n"
+            "`/userinfo @telegram`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "⚠️ **Importante:**\n"
+            "• Algumas informações podem estar ocultas\n"
+            "• Depende das configurações de privacidade\n"
+            "• Use com responsabilidade!\n\n"
+            "🤖 @CatalystServerRobot",
+            buttons=[[Button.inline("🗑️ Fechar", data=f"apagarmensagem:{id_user_btn}")]]
+        )
+
+    elif acao == "cmd_vulnerabilidades":
+        await safe_edit_message(event,
+            "🔒 **COMO USAR /vulnerabilidades**\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 **Uso simples:**\n"
+            "Digite `/vulnerabilidades [url]` seguido da URL do site\n\n"
+            "🎯 **O que o scanner verifica:**\n"
+            "• 🔐 Cabeçalhos de segurança\n"
+            "• 🔒 Configuração SSL/TLS\n"
+            "• 📁 Arquivos sensíveis expostos\n"
+            "• 💉 SQL Injection\n"
+            "• 🚨 Cross-Site Scripting (XSS)\n"
+            "• 📂 Directory Traversal\n"
+            "• 📰 Information Disclosure\n"
+            "• 🛡️ Proteção CSRF\n"
+            "• 🌍 Política CORS\n"
+            "• 🔧 Stack de tecnologias\n\n"
+            "💡 **Exemplo:**\n"
+            "`/vulnerabilidades https://example.com`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "⚠️ **Use com responsabilidade e apenas em sites próprios!**\n\n"
             "🤖 @CatalystServerRobot",
             buttons=[[Button.inline("🗑️ Fechar", data=f"apagarmensagem:{id_user_btn}")]]
         )
@@ -5103,6 +5174,1138 @@ async def api_analyzer_handler(event):
             "🤖 @CatalystServerRobot"
         )
 
+# Classe para scanner de vulnerabilidades
+class VulnerabilityScanner:
+    def __init__(self):
+        self.vulnerabilities_found = []
+        self.scan_results = {}
+
+    async def scan_website(self, url):
+        """Scanner completo de vulnerabilidades"""
+        self.vulnerabilities_found = []
+        self.scan_results = {
+            'url': url,
+            'timestamp': datetime.now().strftime('%d/%m/%Y %H:%M:%S'),
+            'vulnerabilities': [],
+            'security_headers': {},
+            'ssl_info': {},
+            'open_ports': [],
+            'technology_stack': [],
+            'sensitive_files': [],
+            'sql_injection': [],
+            'xss_vectors': [],
+            'directory_traversal': [],
+            'information_disclosure': [],
+            'csrf_protection': 'unknown',
+            'cors_policy': 'unknown'
+        }
+
+        try:
+            # 1. Verificar cabeçalhos de segurança
+            await self._check_security_headers(url)
+            
+            # 2. Verificar SSL/TLS
+            await self._check_ssl_configuration(url)
+            
+            # 3. Verificar arquivos sensíveis
+            await self._check_sensitive_files(url)
+            
+            # 4. Testar SQL Injection
+            await self._test_sql_injection(url)
+            
+            # 5. Testar XSS
+            await self._test_xss_vulnerabilities(url)
+            
+            # 6. Testar Directory Traversal
+            await self._test_directory_traversal(url)
+            
+            # 7. Verificar Information Disclosure
+            await self._check_information_disclosure(url)
+            
+            # 8. Verificar proteção CSRF
+            await self._check_csrf_protection(url)
+            
+            # 9. Verificar política CORS
+            await self._check_cors_policy(url)
+            
+            # 10. Detectar tecnologias
+            await self._detect_technologies(url)
+
+            return self.scan_results
+
+        except Exception as e:
+            self.scan_results['error'] = str(e)
+            return self.scan_results
+
+    async def _check_security_headers(self, url):
+        """Verificar cabeçalhos de segurança"""
+        try:
+            response = requests.get(url, timeout=10, verify=False)
+            headers = response.headers
+
+            security_headers = {
+                'X-Content-Type-Options': headers.get('X-Content-Type-Options'),
+                'X-Frame-Options': headers.get('X-Frame-Options'),
+                'X-XSS-Protection': headers.get('X-XSS-Protection'),
+                'Strict-Transport-Security': headers.get('Strict-Transport-Security'),
+                'Content-Security-Policy': headers.get('Content-Security-Policy'),
+                'Referrer-Policy': headers.get('Referrer-Policy'),
+                'Permissions-Policy': headers.get('Permissions-Policy')
+            }
+
+            self.scan_results['security_headers'] = security_headers
+
+            # Verificar vulnerabilidades relacionadas aos headers
+            missing_headers = []
+            for header, value in security_headers.items():
+                if not value:
+                    missing_headers.append(header)
+                    self.vulnerabilities_found.append({
+                        'type': 'Missing Security Header',
+                        'severity': 'Medium',
+                        'description': f'Header {header} não encontrado',
+                        'recommendation': f'Adicionar header {header} para melhor segurança'
+                    })
+
+            if 'Server' in headers:
+                self.vulnerabilities_found.append({
+                    'type': 'Information Disclosure',
+                    'severity': 'Low',
+                    'description': f'Server header exposto: {headers["Server"]}',
+                    'recommendation': 'Ocultar ou modificar o header Server'
+                })
+
+        except Exception as e:
+            self.scan_results['security_headers']['error'] = str(e)
+
+    async def _check_ssl_configuration(self, url):
+        """Verificar configuração SSL/TLS"""
+        try:
+            if url.startswith('https://'):
+                import ssl
+                import socket
+                from urllib.parse import urlparse
+
+                parsed_url = urlparse(url)
+                hostname = parsed_url.hostname
+                port = parsed_url.port or 443
+
+                context = ssl.create_default_context()
+                
+                with socket.create_connection((hostname, port), timeout=10) as sock:
+                    with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+                        cert = ssock.getpeercert()
+                        
+                        self.scan_results['ssl_info'] = {
+                            'version': ssock.version(),
+                            'cipher': ssock.cipher(),
+                            'certificate': {
+                                'subject': dict(x[0] for x in cert['subject']),
+                                'issuer': dict(x[0] for x in cert['issuer']),
+                                'version': cert['version'],
+                                'notBefore': cert['notBefore'],
+                                'notAfter': cert['notAfter']
+                            }
+                        }
+
+                        # Verificar se o certificado está próximo do vencimento
+                        from datetime import datetime
+                        not_after = datetime.strptime(cert['notAfter'], '%b %d %H:%M:%S %Y %Z')
+                        days_until_expiry = (not_after - datetime.now()).days
+
+                        if days_until_expiry < 30:
+                            self.vulnerabilities_found.append({
+                                'type': 'SSL Certificate',
+                                'severity': 'High' if days_until_expiry < 7 else 'Medium',
+                                'description': f'Certificado SSL expira em {days_until_expiry} dias',
+                                'recommendation': 'Renovar certificado SSL'
+                            })
+
+        except Exception as e:
+            self.scan_results['ssl_info']['error'] = str(e)
+
+    async def _check_sensitive_files(self, url):
+        """Verificar arquivos sensíveis expostos"""
+        sensitive_paths = [
+            '/robots.txt',
+            '/.env',
+            '/config.php',
+            '/wp-config.php',
+            '/.git/config',
+            '/admin',
+            '/administrator',
+            '/phpmyadmin',
+            '/mysql',
+            '/database',
+            '/backup',
+            '/test',
+            '/dev',
+            '/api',
+            '/debug',
+            '/.htaccess',
+            '/web.config',
+            '/crossdomain.xml',
+            '/clientaccesspolicy.xml',
+            '/sitemap.xml',
+            '/readme.txt',
+            '/license.txt',
+            '/changelog.txt'
+        ]
+
+        base_url = url.rstrip('/')
+        found_files = []
+
+        for path in sensitive_paths:
+            try:
+                test_url = base_url + path
+                response = requests.get(test_url, timeout=5, verify=False)
+                
+                if response.status_code == 200:
+                    found_files.append({
+                        'path': path,
+                        'status_code': response.status_code,
+                        'content_length': len(response.content),
+                        'content_type': response.headers.get('Content-Type', 'unknown')
+                    })
+
+                    severity = 'High' if path in ['/.env', '/config.php', '/.git/config'] else 'Medium'
+                    
+                    self.vulnerabilities_found.append({
+                        'type': 'Sensitive File Exposure',
+                        'severity': severity,
+                        'description': f'Arquivo sensível exposto: {path}',
+                        'recommendation': f'Restringir acesso ao arquivo {path}'
+                    })
+
+            except:
+                continue
+
+        self.scan_results['sensitive_files'] = found_files
+
+    async def _test_sql_injection(self, url):
+        """Testar SQL Injection"""
+        sql_payloads = [
+            "' OR '1'='1",
+            "' OR 1=1--",
+            "' UNION SELECT NULL--",
+            "'; DROP TABLE users--",
+            "' AND (SELECT COUNT(*) FROM information_schema.tables)>0--",
+            "' OR SLEEP(5)--"
+        ]
+
+        sql_vulnerabilities = []
+        
+        try:
+            # Primeiro, fazer uma requisição normal para comparação
+            normal_response = requests.get(url, timeout=10, verify=False)
+            normal_time = normal_response.elapsed.total_seconds()
+            normal_content = normal_response.text
+
+            for payload in sql_payloads:
+                try:
+                    # Testar em parâmetros GET
+                    test_url = f"{url}?id={payload}"
+                    response = requests.get(test_url, timeout=15, verify=False)
+                    response_time = response.elapsed.total_seconds()
+
+                    # Verificar indicadores de SQL Injection
+                    error_indicators = [
+                        'mysql_fetch_array',
+                        'ORA-01756',
+                        'Microsoft OLE DB Provider for ODBC Drivers',
+                        'SQLServer JDBC Driver',
+                        'postgresql',
+                        'syntax error',
+                        'mysql_num_rows',
+                        'Warning: mysql',
+                        'MySQLSyntaxErrorException'
+                    ]
+
+                    content_lower = response.text.lower()
+                    
+                    for indicator in error_indicators:
+                        if indicator.lower() in content_lower:
+                            sql_vulnerabilities.append({
+                                'payload': payload,
+                                'url': test_url,
+                                'indicator': indicator,
+                                'method': 'GET'
+                            })
+
+                            self.vulnerabilities_found.append({
+                                'type': 'SQL Injection',
+                                'severity': 'Critical',
+                                'description': f'Possível SQL Injection com payload: {payload}',
+                                'recommendation': 'Implementar prepared statements e validação de entrada'
+                            })
+                            break
+
+                    # Verificar time-based SQL injection
+                    if 'SLEEP' in payload and response_time > normal_time + 4:
+                        sql_vulnerabilities.append({
+                            'payload': payload,
+                            'url': test_url,
+                            'indicator': f'Time delay: {response_time}s',
+                            'method': 'GET (Time-based)'
+                        })
+
+                        self.vulnerabilities_found.append({
+                            'type': 'Time-based SQL Injection',
+                            'severity': 'Critical',
+                            'description': f'Time-based SQL Injection detectado com delay de {response_time}s',
+                            'recommendation': 'Implementar prepared statements e validação de entrada'
+                        })
+
+                except:
+                    continue
+
+        except Exception as e:
+            sql_vulnerabilities.append({'error': str(e)})
+
+        self.scan_results['sql_injection'] = sql_vulnerabilities
+
+    async def _test_xss_vulnerabilities(self, url):
+        """Testar XSS (Cross-Site Scripting)"""
+        xss_payloads = [
+            '<script>alert("XSS")</script>',
+            '<img src=x onerror=alert("XSS")>',
+            '<svg onload=alert("XSS")>',
+            '"><script>alert("XSS")</script>',
+            "javascript:alert('XSS')",
+            '<iframe src="javascript:alert(\'XSS\')"></iframe>',
+            '<body onload=alert("XSS")>',
+            '<input type="text" onfocus="alert(\'XSS\')" autofocus>'
+        ]
+
+        xss_vulnerabilities = []
+
+        try:
+            for payload in xss_payloads:
+                try:
+                    # Testar em parâmetros GET
+                    test_url = f"{url}?search={payload}"
+                    response = requests.get(test_url, timeout=10, verify=False)
+
+                    # Verificar se o payload foi refletido na resposta
+                    if payload in response.text:
+                        xss_vulnerabilities.append({
+                            'payload': payload,
+                            'url': test_url,
+                            'type': 'Reflected XSS',
+                            'method': 'GET'
+                        })
+
+                        self.vulnerabilities_found.append({
+                            'type': 'Cross-Site Scripting (XSS)',
+                            'severity': 'High',
+                            'description': f'XSS refletido encontrado com payload: {payload[:50]}...',
+                            'recommendation': 'Implementar sanitização e validação de entrada'
+                        })
+
+                except:
+                    continue
+
+        except Exception as e:
+            xss_vulnerabilities.append({'error': str(e)})
+
+        self.scan_results['xss_vectors'] = xss_vulnerabilities
+
+    async def _test_directory_traversal(self, url):
+        """Testar Directory Traversal"""
+        traversal_payloads = [
+            '../../../etc/passwd',
+            '..\\..\\..\\windows\\system32\\drivers\\etc\\hosts',
+            '....//....//....//etc/passwd',
+            '%2e%2e%2f%2e%2e%2f%2e%2e%2f%etc%2fpasswd',
+            '..%252f..%252f..%252fetc%252fpasswd'
+        ]
+
+        traversal_vulnerabilities = []
+
+        try:
+            for payload in traversal_payloads:
+                try:
+                    test_url = f"{url}?file={payload}"
+                    response = requests.get(test_url, timeout=10, verify=False)
+
+                    # Verificar indicadores de directory traversal bem-sucedido
+                    unix_indicators = ['root:x:0:0:', '/bin/bash', '/sbin/nologin']
+                    windows_indicators = ['[drivers]', '# Copyright', 'localhost']
+
+                    content_lower = response.text.lower()
+
+                    for indicator in unix_indicators + windows_indicators:
+                        if indicator.lower() in content_lower:
+                            traversal_vulnerabilities.append({
+                                'payload': payload,
+                                'url': test_url,
+                                'indicator': indicator
+                            })
+
+                            self.vulnerabilities_found.append({
+                                'type': 'Directory Traversal',
+                                'severity': 'Critical',
+                                'description': f'Directory traversal encontrado com payload: {payload}',
+                                'recommendation': 'Implementar validação de caminho de arquivo'
+                            })
+                            break
+
+                except:
+                    continue
+
+        except Exception as e:
+            traversal_vulnerabilities.append({'error': str(e)})
+
+        self.scan_results['directory_traversal'] = traversal_vulnerabilities
+
+    async def _check_information_disclosure(self, url):
+        """Verificar vazamento de informações"""
+        disclosure_checks = []
+
+        try:
+            response = requests.get(url, timeout=10, verify=False)
+            content = response.text.lower()
+            headers = response.headers
+
+            # Verificar informações sensíveis no conteúdo
+            sensitive_patterns = [
+                (r'password\s*[:=]\s*["\']?([^"\'\s]+)', 'Password in source'),
+                (r'api[_-]?key\s*[:=]\s*["\']?([^"\'\s]+)', 'API Key in source'),
+                (r'secret\s*[:=]\s*["\']?([^"\'\s]+)', 'Secret in source'),
+                (r'token\s*[:=]\s*["\']?([^"\'\s]+)', 'Token in source'),
+                (r'mysql://[^"\'\s]+', 'Database connection string'),
+                (r'mongodb://[^"\'\s]+', 'MongoDB connection string'),
+                (r'postgresql://[^"\'\s]+', 'PostgreSQL connection string')
+            ]
+
+            for pattern, description in sensitive_patterns:
+                import re
+                matches = re.findall(pattern, content, re.IGNORECASE)
+                if matches:
+                    disclosure_checks.append({
+                        'type': description,
+                        'matches': len(matches),
+                        'sample': matches[0][:20] + '...' if matches[0] else ''
+                    })
+
+                    self.vulnerabilities_found.append({
+                        'type': 'Information Disclosure',
+                        'severity': 'High',
+                        'description': f'{description} encontrado no código fonte',
+                        'recommendation': 'Remover informações sensíveis do código fonte'
+                    })
+
+            # Verificar headers que podem vazar informações
+            revealing_headers = ['Server', 'X-Powered-By', 'X-AspNet-Version', 'X-Generator']
+            for header in revealing_headers:
+                if header in headers:
+                    disclosure_checks.append({
+                        'type': f'Header {header}',
+                        'value': headers[header]
+                    })
+
+        except Exception as e:
+            disclosure_checks.append({'error': str(e)})
+
+        self.scan_results['information_disclosure'] = disclosure_checks
+
+    async def _check_csrf_protection(self, url):
+        """Verificar proteção CSRF"""
+        try:
+            response = requests.get(url, timeout=10, verify=False)
+            content = response.text.lower()
+
+            # Procurar por tokens CSRF
+            csrf_indicators = [
+                'csrf_token',
+                '_token',
+                'authenticity_token',
+                'anti-forgery-token',
+                '__requestverificationtoken'
+            ]
+
+            csrf_found = any(indicator in content for indicator in csrf_indicators)
+            
+            if csrf_found:
+                self.scan_results['csrf_protection'] = 'Protected'
+            else:
+                self.scan_results['csrf_protection'] = 'Not Protected'
+                self.vulnerabilities_found.append({
+                    'type': 'CSRF Protection',
+                    'severity': 'Medium',
+                    'description': 'Nenhum token CSRF encontrado',
+                    'recommendation': 'Implementar proteção CSRF com tokens'
+                })
+
+        except Exception as e:
+            self.scan_results['csrf_protection'] = f'Error: {str(e)}'
+
+    async def _check_cors_policy(self, url):
+        """Verificar política CORS"""
+        try:
+            headers = {
+                'Origin': 'https://evil.com'
+            }
+            response = requests.get(url, headers=headers, timeout=10, verify=False)
+            
+            cors_header = response.headers.get('Access-Control-Allow-Origin')
+            
+            if cors_header == '*':
+                self.scan_results['cors_policy'] = 'Wildcard (*)'
+                self.vulnerabilities_found.append({
+                    'type': 'CORS Misconfiguration',
+                    'severity': 'Medium',
+                    'description': 'CORS configurado para aceitar qualquer origem (*)',
+                    'recommendation': 'Configurar CORS para origens específicas'
+                })
+            elif cors_header:
+                self.scan_results['cors_policy'] = f'Specific: {cors_header}'
+            else:
+                self.scan_results['cors_policy'] = 'Not Set'
+
+        except Exception as e:
+            self.scan_results['cors_policy'] = f'Error: {str(e)}'
+
+    async def _detect_technologies(self, url):
+        """Detectar tecnologias utilizadas"""
+        try:
+            response = requests.get(url, timeout=10, verify=False)
+            headers = response.headers
+            content = response.text.lower()
+
+            technologies = []
+
+            # Detectar através de headers
+            tech_headers = {
+                'X-Powered-By': 'Framework/Language',
+                'Server': 'Web Server',
+                'X-AspNet-Version': 'ASP.NET Version',
+                'X-Generator': 'CMS/Generator'
+            }
+
+            for header, tech_type in tech_headers.items():
+                if header in headers:
+                    technologies.append({
+                        'name': headers[header],
+                        'type': tech_type,
+                        'detection_method': 'Header'
+                    })
+
+            # Detectar através de conteúdo
+            content_patterns = [
+                ('wordpress', 'WordPress', 'CMS'),
+                ('drupal', 'Drupal', 'CMS'),
+                ('joomla', 'Joomla', 'CMS'),
+                ('jquery', 'jQuery', 'JavaScript Library'),
+                ('bootstrap', 'Bootstrap', 'CSS Framework'),
+                ('angular', 'Angular', 'JavaScript Framework'),
+                ('react', 'React', 'JavaScript Library'),
+                ('vue', 'Vue.js', 'JavaScript Framework')
+            ]
+
+            for pattern, name, tech_type in content_patterns:
+                if pattern in content:
+                    technologies.append({
+                        'name': name,
+                        'type': tech_type,
+                        'detection_method': 'Content Analysis'
+                    })
+
+            self.scan_results['technology_stack'] = technologies
+
+        except Exception as e:
+            self.scan_results['technology_stack'] = [{'error': str(e)}]
+
+@bot.on(events.NewMessage(pattern=r'^/userinfo (.+)'))
+async def userinfo_handler(event):
+    # Verificar autorização
+    if not eh_autorizado(event.sender_id):
+        await event.reply("🚫 **ACESSO NEGADO** - Você não tem autorização para usar este bot.")
+        return
+
+    user_input = event.pattern_match.group(1).strip()
+    user_id = event.sender_id
+
+    # Validar entrada (pode ser @username, username, ou ID numérico)
+    if not user_input:
+        await event.reply(
+            "❌ **FORMATO INVÁLIDO**\n\n"
+            "💡 **Exemplos corretos:**\n"
+            "`/userinfo @username`\n"
+            "`/userinfo username`\n"
+            "`/userinfo 123456789`\n\n"
+            "🤖 @CatalystServerRobot"
+        )
+        return
+
+    processing_msg = await event.reply(
+        f"🔍 **EXTRAINDO INFORMAÇÕES DO USUÁRIO...**\n\n"
+        f"🎯 **Alvo:** `{user_input}`\n"
+        f"⏳ **STATUS:** Coletando dados...\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🔍 **Informações sendo coletadas:**\n"
+        "• Dados básicos do perfil\n"
+        "• Histórico de atividade\n"
+        "• Grupos em comum\n"
+        "• Foto de perfil\n"
+        "• Bio e informações públicas\n"
+        "• Status online\n"
+        "• Configurações de privacidade\n\n"
+        "⏳ **Aguarde...**"
+    )
+
+    try:
+        # Tentar obter o usuário
+        target_user = None
+        
+        # Se for um ID numérico
+        if user_input.isdigit():
+            try:
+                target_user = await bot.get_entity(int(user_input))
+            except:
+                pass
+        
+        # Se não conseguiu como ID ou se é username
+        if target_user is None:
+            # Remover @ se houver
+            username = user_input.lstrip('@')
+            try:
+                target_user = await bot.get_entity(username)
+            except:
+                await processing_msg.edit(
+                    f"❌ **USUÁRIO NÃO ENCONTRADO**\n\n"
+                    f"🎯 **Busca:** `{user_input}`\n\n"
+                    "⚠️ **Possíveis causas:**\n"
+                    "• Usuário não existe\n"
+                    "• Username incorreto\n"
+                    "• ID inválido\n"
+                    "• Usuário bloqueou o bot\n"
+                    "• Conta deletada\n\n"
+                    "🤖 @CatalystServerRobot"
+                )
+                return
+
+        # Obter informações completas
+        full_user = await bot(GetFullUserRequest(target_user.id))
+        user = full_user.users[0]
+        user_full = full_user.full_user
+
+        # Coletar informações básicas
+        user_info = {
+            'id': user.id,
+            'first_name': getattr(user, 'first_name', None),
+            'last_name': getattr(user, 'last_name', None),
+            'username': getattr(user, 'username', None),
+            'phone': getattr(user, 'phone', None),
+            'is_bot': getattr(user, 'bot', False),
+            'is_verified': getattr(user, 'verified', False),
+            'is_premium': getattr(user, 'premium', False),
+            'is_scam': getattr(user, 'scam', False),
+            'is_fake': getattr(user, 'fake', False),
+            'is_support': getattr(user, 'support', False),
+            'is_restricted': getattr(user, 'restricted', False),
+            'restriction_reason': getattr(user, 'restriction_reason', None),
+            'lang_code': getattr(user, 'lang_code', None),
+            'dc_id': getattr(user_full, 'profile_photo', {}).get('dc_id') if hasattr(user_full, 'profile_photo') and user_full.profile_photo else None,
+        }
+
+        # Informações do perfil completo
+        profile_info = {
+            'bio': getattr(user_full, 'about', None),
+            'common_chats_count': getattr(user_full, 'common_chats_count', 0),
+            'can_pin_message': getattr(user_full, 'can_pin_message', False),
+            'pinned_msg_id': getattr(user_full, 'pinned_msg_id', None),
+            'blocked': getattr(user_full, 'blocked', False),
+            'phone_calls_available': getattr(user_full, 'phone_calls_available', False),
+            'phone_calls_private': getattr(user_full, 'phone_calls_private', False),
+            'video_calls_available': getattr(user_full, 'video_calls_available', False),
+        }
+
+        # Tentar obter status online (pode falhar dependendo das configurações de privacidade)
+        try:
+            from telethon.tl.functions.users import GetUsersRequest
+            users_result = await bot(GetUsersRequest([user.id]))
+            if users_result:
+                target_user_status = users_result[0]
+                if hasattr(target_user_status, 'status'):
+                    status = target_user_status.status
+                    if hasattr(status, '__class__'):
+                        status_type = status.__class__.__name__
+                        if hasattr(status, 'was_online'):
+                            last_seen = status.was_online.strftime("%d/%m/%Y %H:%M:%S") if status.was_online else "Nunca"
+                        else:
+                            last_seen = "Desconhecido"
+                    else:
+                        status_type = "Desconhecido"
+                        last_seen = "Desconhecido"
+                else:
+                    status_type = "Desconhecido"
+                    last_seen = "Desconhecido"
+        except:
+            status_type = "Privado"
+            last_seen = "Privado"
+
+        # Tentar obter foto de perfil
+        profile_photo_info = None
+        try:
+            if user_full.profile_photo:
+                profile_photo_info = {
+                    'has_photo': True,
+                    'photo_id': getattr(user_full.profile_photo, 'id', None),
+                    'dc_id': getattr(user_full.profile_photo, 'dc_id', None)
+                }
+            else:
+                profile_photo_info = {'has_photo': False}
+        except:
+            profile_photo_info = {'has_photo': False}
+
+        # Construir relatório detalhado
+        report = f"👤 **RELATÓRIO DETALHADO DO USUÁRIO**\n\n"
+        report += f"🎯 **Alvo analisado:** `{user_input}`\n"
+        report += f"📅 **Data da análise:** `{datetime.now().strftime('%d/%m/%Y %H:%M:%S')}`\n\n"
+        report += "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+        # Informações básicas
+        report += "📋 **INFORMAÇÕES BÁSICAS:**\n"
+        report += f"🆔 **ID:** `{user_info['id']}`\n"
+        if user_info['first_name']:
+            report += f"👤 **Nome:** `{user_info['first_name']}`\n"
+        if user_info['last_name']:
+            report += f"👥 **Sobrenome:** `{user_info['last_name']}`\n"
+        if user_info['username']:
+            report += f"📛 **Username:** `@{user_info['username']}`\n"
+        
+        # Análise detalhada do telefone
+        if user_info['phone']:
+            report += f"📞 **Telefone:** `{user_info['phone']}`\n"
+            report += f"📍 **País do telefone:** `{user_info['phone'][:3] if len(user_info['phone']) > 3 else 'N/A'}`\n"
+        else:
+            report += f"📞 **Telefone:** `❌ PRIVADO/OCULTO`\n"
+            report += f"🔒 **Privacidade:** Usuário ocultou o número\n"
+            
+            # Tentar métodos alternativos para detectar informações
+            try:
+                # Verificar se existe indicação de país através de outros métodos
+                if user_info.get('lang_code'):
+                    country_hints = {
+                        'pt': 'Possivelmente Brasil/Portugal',
+                        'pt-br': 'Brasil',
+                        'en': 'País anglófono',
+                        'es': 'País hispanófono',
+                        'ru': 'Rússia/países ex-URSS'
+                    }
+                    hint = country_hints.get(user_info['lang_code'], 'Desconhecido')
+                    report += f"🌍 **Possível região:** `{hint}`\n"
+            except:
+                pass
+                
+        if user_info['lang_code']:
+            report += f"🌍 **Idioma:** `{user_info['lang_code']}`\n"
+        if user_info['dc_id']:
+            report += f"🌐 **Data Center:** `DC{user_info['dc_id']}`\n"
+            # Adicionar informação sobre localização baseada no DC
+            dc_locations = {
+                1: "Miami, EUA (América)",
+                2: "Amsterdam, Holanda (Europa)",
+                3: "Miami, EUA (América)",
+                4: "Amsterdam, Holanda (Europa)",
+                5: "Singapura (Ásia-Pacífico)"
+            }
+            if user_info['dc_id'] in dc_locations:
+                report += f"📍 **Região do DC:** `{dc_locations[user_info['dc_id']]}`\n"
+        report += "\n"
+
+        # Status e configurações
+        report += "⚙️ **STATUS E CONFIGURAÇÕES:**\n"
+        report += f"🤖 **É Bot:** `{'Sim' if user_info['is_bot'] else 'Não'}`\n"
+        report += f"✅ **Verificado:** `{'Sim' if user_info['is_verified'] else 'Não'}`\n"
+        report += f"💎 **Premium:** `{'Sim' if user_info['is_premium'] else 'Não'}`\n"
+        report += f"⚠️ **Scam:** `{'Sim' if user_info['is_scam'] else 'Não'}`\n"
+        report += f"🔴 **Fake:** `{'Sim' if user_info['is_fake'] else 'Não'}`\n"
+        report += f"🛠️ **Suporte:** `{'Sim' if user_info['is_support'] else 'Não'}`\n"
+        report += f"🚫 **Restrito:** `{'Sim' if user_info['is_restricted'] else 'Não'}`\n"
+        if user_info['restriction_reason']:
+            report += f"⚠️ **Motivo da Restrição:** `{user_info['restriction_reason']}`\n"
+        report += f"🔄 **Status Online:** `{status_type}`\n"
+        report += f"👀 **Última vez visto:** `{last_seen}`\n\n"
+
+        # Informações do perfil
+        if profile_info['bio']:
+            report += f"📝 **BIO:**\n`{profile_info['bio'][:200]}{'...' if len(profile_info['bio']) > 200 else ''}`\n\n"
+
+        report += "🔗 **INTERAÇÕES:**\n"
+        report += f"👥 **Grupos em comum:** `{profile_info['common_chats_count']}`\n"
+        report += f"📌 **Pode fixar mensagens:** `{'Sim' if profile_info['can_pin_message'] else 'Não'}`\n"
+        if profile_info['pinned_msg_id']:
+            report += f"📍 **Mensagem fixada:** `ID {profile_info['pinned_msg_id']}`\n"
+        report += f"🚫 **Bloqueado:** `{'Sim' if profile_info['blocked'] else 'Não'}`\n\n"
+
+        report += "📞 **CHAMADAS:**\n"
+        report += f"📞 **Chamadas disponíveis:** `{'Sim' if profile_info['phone_calls_available'] else 'Não'}`\n"
+        report += f"🔒 **Chamadas privadas:** `{'Sim' if profile_info['phone_calls_private'] else 'Não'}`\n"
+        report += f"📹 **Vídeo chamadas:** `{'Sim' if profile_info['video_calls_available'] else 'Não'}`\n\n"
+
+        report += "🖼️ **FOTO DE PERFIL:**\n"
+        if profile_photo_info['has_photo']:
+            report += f"📸 **Tem foto:** `Sim`\n"
+            if profile_photo_info.get('photo_id'):
+                report += f"🆔 **ID da foto:** `{profile_photo_info['photo_id']}`\n"
+            if profile_photo_info.get('dc_id'):
+                report += f"🌐 **DC da foto:** `DC{profile_photo_info['dc_id']}`\n"
+        else:
+            report += f"📸 **Tem foto:** `Não`\n"
+
+        report += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+
+        # Tentar baixar foto de perfil
+        photo_file = None
+        if profile_photo_info['has_photo']:
+            try:
+                os.makedirs("temp", exist_ok=True)
+                photo_file = f"temp/profile_{user_info['id']}.jpg"
+                await bot.download_profile_photo(user.id, file=photo_file)
+                report += "📸 **Foto de perfil salva com sucesso**\n\n"
+            except Exception as e:
+                report += f"❌ **Erro ao baixar foto:** `{str(e)[:50]}...`\n\n"
+
+        # Análise avançada de privacidade
+        report += "🔒 **ANÁLISE DE PRIVACIDADE:**\n"
+        privacy_score = 0
+        privacy_info = []
+
+        if not user_info['phone']:
+            privacy_score += 25
+            privacy_info.append("📞 Telefone oculto")
+        if not user_info['username']:
+            privacy_score += 15  
+            privacy_info.append("📛 Sem username público")
+        if not profile_info['bio']:
+            privacy_score += 10
+            privacy_info.append("📝 Bio vazia/oculta")
+        if profile_info.get('phone_calls_private', True):
+            privacy_score += 20
+            privacy_info.append("📞 Chamadas privadas")
+        if status_type == "Privado":
+            privacy_score += 30
+            privacy_info.append("👀 Status online privado")
+
+        if privacy_info:
+            report += "\n".join(privacy_info) + "\n"
+            report += f"🔒 **Nível de Privacidade:** `{privacy_score}/100`\n"
+            if privacy_score >= 70:
+                report += "🔒 **PRIVACIDADE ALTA** - Usuário muito reservado\n"
+            elif privacy_score >= 40:
+                report += "🔐 **PRIVACIDADE MÉDIA** - Algumas informações ocultas\n"
+            else:
+                report += "📖 **PRIVACIDADE BAIXA** - Usuário relativamente aberto\n"
+        else:
+            report += "📖 **Usuário com perfil público**\n"
+
+        report += "\n"
+
+        # Informações adicionais de segurança
+        report += "🛡️ **ANÁLISE DE SEGURANÇA:**\n"
+        risk_score = 0
+        warnings = []
+
+        if user_info['is_scam']:
+            risk_score += 50
+            warnings.append("⚠️ Conta marcada como SCAM")
+        if user_info['is_fake']:
+            risk_score += 40
+            warnings.append("⚠️ Conta marcada como FAKE")
+        if user_info['is_restricted']:
+            risk_score += 30
+            warnings.append("⚠️ Conta com restrições")
+        if not user_info['username'] and not user_info['phone']:
+            risk_score += 20
+            warnings.append("⚠️ Sem username ou telefone público")
+        if user_info['is_bot'] and not user_info['is_verified']:
+            risk_score += 15
+            warnings.append("⚠️ Bot não verificado")
+
+        if warnings:
+            report += "\n".join(warnings) + "\n"
+        else:
+            report += "✅ Nenhum alerta de segurança detectado\n"
+
+        report += f"📊 **Score de Risco:** `{risk_score}/100`\n"
+        if risk_score >= 70:
+            report += "🔴 **RISCO ALTO**\n"
+        elif risk_score >= 40:
+            report += "🟡 **RISCO MÉDIO**\n"
+        else:
+            report += "🟢 **RISCO BAIXO**\n"
+
+        report += "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        report += "⚠️ **IMPORTANTE:**\n"
+        report += "• Algumas informações podem estar ocultas por configurações de privacidade\n"
+        report += "• Este relatório é baseado em dados públicos do Telegram\n"
+        report += "• Use estas informações com responsabilidade\n\n"
+        report += "🤖 @CatalystServerRobot"
+
+        # Salvar relatório em arquivo
+        filename = f"temp/userinfo_{user_info['id']}.txt"
+        os.makedirs("temp", exist_ok=True)
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(f"RELATÓRIO DETALHADO DO USUÁRIO TELEGRAM\n")
+            f.write(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
+            f.write(f"Alvo: {user_input}\n\n")
+            f.write(f"ID: {user_info['id']}\n")
+            f.write(f"Nome: {user_info['first_name'] or 'N/A'} {user_info['last_name'] or ''}\n")
+            f.write(f"Username: @{user_info['username']}\n" if user_info['username'] else "Username: N/A\n")
+            f.write(f"Telefone: {user_info['phone'] or 'N/A'}\n")
+            f.write(f"Bio: {profile_info['bio'] or 'N/A'}\n")
+            f.write(f"Grupos em comum: {profile_info['common_chats_count']}\n")
+            f.write(f"Status: {status_type}\n")
+            f.write(f"Última vez visto: {last_seen}\n")
+            f.write(f"É Bot: {'Sim' if user_info['is_bot'] else 'Não'}\n")
+            f.write(f"Verificado: {'Sim' if user_info['is_verified'] else 'Não'}\n")
+            f.write(f"Premium: {'Sim' if user_info['is_premium'] else 'Não'}\n")
+            f.write(f"Score de Risco: {risk_score}/100\n")
+            if warnings:
+                f.write(f"\nAlertas de Segurança:\n")
+                for warning in warnings:
+                    f.write(f"- {warning}\n")
+
+        await processing_msg.edit(report[:4000] + ("..." if len(report) > 4000 else ""))
+
+        # Enviar arquivo com relatório completo
+        files_to_send = [filename]
+        if photo_file and os.path.exists(photo_file):
+            files_to_send.append(photo_file)
+
+        if len(files_to_send) == 1:
+            await bot.send_file(
+                user_id,
+                file=filename,
+                caption=f"📄 **Relatório completo - @{user_info['username'] or user_info['id']}**\n\n🤖 @CatalystServerRobot",
+                buttons=[[Button.inline("🗑️ Apagar", data=f"apagarmensagem:{user_id}")]]
+            )
+        else:
+            # Enviar múltiplos arquivos
+            await bot.send_file(
+                user_id,
+                file=files_to_send,
+                caption=f"📄 **Relatório + Foto de perfil - @{user_info['username'] or user_info['id']}**\n\n🤖 @CatalystServerRobot",
+                buttons=[[Button.inline("🗑️ Apagar", data=f"apagarmensagem:{user_id}")]]
+            )
+
+        # Limpar arquivos temporários
+        try:
+            os.remove(filename)
+            if photo_file and os.path.exists(photo_file):
+                os.remove(photo_file)
+        except:
+            pass
+
+    except Exception as e:
+        await processing_msg.edit(
+            f"❌ **ERRO AO EXTRAIR INFORMAÇÕES**\n\n"
+            f"⚠️ Erro: `{str(e)[:200]}...`\n\n"
+            "🔍 **Possíveis causas:**\n"
+            "• Usuário com configurações de privacidade rigorosas\n"
+            "• Conta deletada ou suspensa\n"
+            "• Erro de conexão com o Telegram\n"
+            "• Bot bloqueado pelo usuário\n\n"
+            "💡 Tente novamente ou verifique se o usuário existe.\n\n"
+            "🤖 @CatalystServerRobot"
+        )
+
+@bot.on(events.NewMessage(pattern=r'^/vulnerabilidades (.+)'))
+async def vulnerabilidades_handler(event):
+    # Verificar autorização
+    if not eh_autorizado(event.sender_id):
+        await event.reply("🚫 **ACESSO NEGADO** - Você não tem autorização para usar este bot.")
+        return
+
+    url = event.pattern_match.group(1).strip()
+    user_id = event.sender_id
+
+    # Validar URL
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+
+    # Mensagem inicial
+    processing_msg = await event.reply(
+        f"🔒 **SCANNER DE VULNERABILIDADES v4.0**\n\n"
+        f"🎯 **URL:** `{url}`\n"
+        f"⏳ **STATUS:** Iniciando varredura completa...\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🕵️ **ANÁLISES EM ANDAMENTO:**\n"
+        "• Cabeçalhos de segurança\n"
+        "• Configuração SSL/TLS\n"
+        "• Arquivos sensíveis expostos\n"
+        "• SQL Injection\n"
+        "• Cross-Site Scripting (XSS)\n"
+        "• Directory Traversal\n"
+        "• Information Disclosure\n"
+        "• Proteção CSRF\n"
+        "• Política CORS\n"
+        "• Stack de tecnologias\n\n"
+        "⏳ **AGUARDE, ISSO PODE LEVAR ALGUNS MINUTOS...**"
+    )
+
+    try:
+        # Executar scanner de vulnerabilidades
+        scanner = VulnerabilityScanner()
+        results = await scanner.scan_website(url)
+
+        if "error" in results:
+            await processing_msg.edit(
+                f"❌ **ERRO NO SCANNER DE VULNERABILIDADES**\n\n"
+                f"🎯 URL: `{url}`\n"
+                f"⚠️ Erro: `{results['error']}`\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "💡 Verifique se a URL está correta e acessível.\n\n"
+                "🤖 @CatalystServerRobot"
+            )
+            return
+
+        # Formatar resultados
+        vulns = results['vulnerabilities']
+        total_vulns = len(vulns)
+        
+        # Contar por severidade
+        critical = len([v for v in vulns if v.get('severity') == 'Critical'])
+        high = len([v for v in vulns if v.get('severity') == 'High'])
+        medium = len([v for v in vulns if v.get('severity') == 'Medium'])
+        low = len([v for v in vulns if v.get('severity') == 'Low'])
+
+        # Determinar nível de risco
+        if critical > 0:
+            risk_level = "🚨 CRÍTICO"
+            risk_color = "🔴"
+        elif high > 0:
+            risk_level = "⚠️ ALTO"
+            risk_color = "🟠"
+        elif medium > 0:
+            risk_level = "⚡ MÉDIO"
+            risk_color = "🟡"
+        elif low > 0:
+            risk_level = "📝 BAIXO"
+            risk_color = "🟢"
+        else:
+            risk_level = "✅ SEGURO"
+            risk_color = "🟢"
+
+        message = f"🔒 **RELATÓRIO DE VULNERABILIDADES**\n\n"
+        message += f"🎯 **URL:** `{results['url']}`\n"
+        message += f"📅 **Data:** `{results['timestamp']}`\n"
+        message += f"🛡️ **Nível de Risco:** {risk_level}\n\n"
+        message += "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        message += f"📊 **RESUMO DAS VULNERABILIDADES:**\n"
+        message += f"• 🚨 **Críticas:** `{critical}`\n"
+        message += f"• ⚠️ **Altas:** `{high}`\n"
+        message += f"• ⚡ **Médias:** `{medium}`\n"
+        message += f"• 📝 **Baixas:** `{low}`\n"
+        message += f"• 📋 **Total:** `{total_vulns}`\n\n"
+
+        if total_vulns > 0:
+            message += f"🔍 **TOP 5 VULNERABILIDADES:**\n"
+            for i, vuln in enumerate(vulns[:5], 1):
+                severity_icon = {
+                    'Critical': '🚨',
+                    'High': '⚠️',
+                    'Medium': '⚡',
+                    'Low': '📝'
+                }.get(vuln.get('severity', 'Unknown'), '❓')
+                
+                message += f"{i}. {severity_icon} **{vuln.get('type', 'Unknown')}**\n"
+                message += f"   {vuln.get('description', 'Sem descrição')[:60]}...\n\n"
+
+            if total_vulns > 5:
+                message += f"• ... e mais {total_vulns - 5} vulnerabilidades\n\n"
+        else:
+            message += f"✅ **NENHUMA VULNERABILIDADE ENCONTRADA!**\n\n"
+
+        message += f"📄 **Relatório completo será enviado como arquivo**\n\n"
+        message += "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        message += "🤖 @CatalystServerRobot"
+
+        # Criar relatório completo em arquivo
+        filename = f"temp/vulnerability_report_{user_id}.txt"
+        os.makedirs("temp", exist_ok=True)
+        
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write("=" * 60 + "\n")
+            f.write("RELATÓRIO COMPLETO DE VULNERABILIDADES\n")
+            f.write("=" * 60 + "\n\n")
+            f.write(f"URL: {results['url']}\n")
+            f.write(f"Data da análise: {results['timestamp']}\n")
+            f.write(f"Total de vulnerabilidades: {total_vulns}\n")
+            f.write(f"Nível de risco: {risk_level}\n\n")
+            
+            f.write("RESUMO POR SEVERIDADE:\n")
+            f.write("-" * 30 + "\n")
+            f.write(f"Críticas: {critical}\n")
+            f.write(f"Altas: {high}\n")
+            f.write(f"Médias: {medium}\n")
+            f.write(f"Baixas: {low}\n\n")
+            
+            if vulns:
+                f.write("DETALHES DAS VULNERABILIDADES:\n")
+                f.write("=" * 50 + "\n\n")
+                
+                for i, vuln in enumerate(vulns, 1):
+                    f.write(f"{i}. {vuln.get('type', 'Tipo desconhecido')}\n")
+                    f.write(f"   Severidade: {vuln.get('severity', 'Desconhecida')}\n")
+                    f.write(f"   Descrição: {vuln.get('description', 'Sem descrição')}\n")
+                    f.write(f"   Recomendação: {vuln.get('recommendation', 'Sem recomendação')}\n\n")
+            
+            # Adicionar detalhes técnicos
+            f.write("\nDETALHES TÉCNICOS:\n")
+            f.write("=" * 30 + "\n\n")
+            
+            f.write("CABEÇALHOS DE SEGURANÇA:\n")
+            for header, value in results.get('security_headers', {}).items():
+                status = "✓ Presente" if value else "✗ Ausente"
+                f.write(f"  {header}: {status}\n")
+            
+            f.write(f"\nSSL/TLS: {results.get('ssl_info', {}).get('version', 'N/A')}\n")
+            f.write(f"Proteção CSRF: {results.get('csrf_protection', 'Desconhecido')}\n")
+            f.write(f"Política CORS: {results.get('cors_policy', 'Desconhecido')}\n\n")
+            
+            if results.get('sensitive_files'):
+                f.write("ARQUIVOS SENSÍVEIS EXPOSTOS:\n")
+                for file_info in results['sensitive_files']:
+                    f.write(f"  {file_info['path']} (HTTP {file_info['status_code']})\n")
+                f.write("\n")
+            
+            if results.get('technology_stack'):
+                f.write("TECNOLOGIAS DETECTADAS:\n")
+                for tech in results['technology_stack']:
+                    if 'name' in tech:
+                        f.write(f"  {tech['name']} ({tech.get('type', 'N/A')})\n")
+                f.write("\n")
+            
+            f.write("=" * 60 + "\n")
+            f.write("Relatório gerado por CATALYST SERVER\n")
+            f.write("@CatalystServerRobot\n")
+
+        await processing_msg.edit(message)
+        await bot.send_file(
+            user_id, 
+            file=filename,
+            caption=f"🔒 **Relatório Completo de Vulnerabilidades - {results['url']}**\n\n🤖 @CatalystServerRobot",
+            buttons=[[Button.inline("🗑️ Apagar", data=f"apagarmensagem:{user_id}")]]
+        )
+
+        # Limpar arquivo temporário
+        try:
+            os.remove(filename)
+        except:
+            pass
+
+    except Exception as e:
+        await processing_msg.edit(
+            f"❌ **ERRO DURANTE ANÁLISE DE VULNERABILIDADES**\n\n"
+            f"⚠️ Erro: `{str(e)[:200]}`\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "💡 Tente novamente ou verifique a URL.\n\n"
+            "🤖 @CatalystServerRobot"
+        )
+
 @bot.on(events.NewMessage(pattern=r'^/geradores$'))
 async def geradores_handler(event):
     # Verificar autorização
@@ -5284,7 +6487,8 @@ async def comandos_handler(event):
         "• `/search [url]` - Buscar logins em sites\n"
         "• `/webscraper [url]` - Extrair dados do site\n"
         "• `/api [url]` - Análise completa de APIs\n"
-        "• `/apikey [url]` - Buscar API Keys expostas\n\n"
+        "• `/apikey [url]` - Buscar API Keys expostas\n"
+        "• `/vulnerabilidades [url]` - Scanner de vulnerabilidades\n\n"
         "📤 **SISTEMA DE REPORTS:**\n"
         "• `/report` - Reports Telegram (básico)\n"
         "• `/report2` - Sistema avançado de reports\n"
@@ -5731,7 +6935,7 @@ async def autorizar_usuario_tempo(event):
         print(f"❌ Erro ao atualizar banco: {e}")
 
     try:
-        # Tentar obter informações do usuário
+        #  obter informações do usuário
         user_info = await bot.get_entity(target_id)
         user_name = getattr(user_info, 'first_name', 'Usuário')
 
